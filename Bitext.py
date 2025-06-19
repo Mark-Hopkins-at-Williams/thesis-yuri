@@ -18,3 +18,9 @@ class Bitext(torch.utils.data.IterableDataset):
           lines2 = f2.read().splitlines()
           pair_list = list(zip(lines1, lines2))
           return iter(pair_list)
+
+
+          
+          
+          
+

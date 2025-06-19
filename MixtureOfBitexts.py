@@ -49,13 +49,7 @@ class MixtureOfBitexts:
                  
 
 
-
-
-
-
-
 mix = MixtureOfBitexts.create_from_files(text_files=text_files1, sampling_probs={('l1', 'l2'): 0.8, ('l1', 'l3'): 0.2}, batch_size=2)
-
 
 mix.next_batch()
 mix.next_batch()
