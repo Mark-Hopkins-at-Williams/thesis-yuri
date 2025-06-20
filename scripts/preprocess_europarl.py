@@ -26,6 +26,8 @@ parser.add_argument("--data_dir", type=str, required=True, help="Directory with 
 parser.add_argument("--out_dir", type=str, required=True, help="Directory for storing the preprocessed data.")
 parser.add_argument("--min_length", type=int, default=10, help="Minimum length of (English) sentences to keep.")
 parser.add_argument("--seed", type=int, default=42, help="Random seed (for shuffling).")
+parser.add_argument("--num_dev", type=int, default=5000, help="Number of sentences to reserve for the dev set.")
+parser.add_argument("--num_test", type=int, default=5000, help="Number of sentences to reserve for the test set.")
 args = parser.parse_args()
 data_dir = Path(args.data_dir)        
 out_dir = Path(args.out_dir)  
@@ -90,12 +92,20 @@ r = random.Random(args.seed)
 r.shuffle(keep_en)
 
 # Write the parallel corpora to disk.
-output = {
-    "en": (out_dir / "english.txt").open("w", encoding="utf-8", newline="\n")
-}
+train_output = { "en": (out_dir / "train.en").open("w", encoding="utf-8", newline="\n") }
+dev_output = { "en": (out_dir / "dev.en").open("w", encoding="utf-8", newline="\n") }
+test_output = { "en": (out_dir / "test.en").open("w", encoding="utf-8", newline="\n") }
 for code in found_lang:
-    output[code] = (out_dir / f"{language_codes[code]}.txt").open("w", encoding="utf-8", newline="\n")
-for en in keep_en:
+    train_output[code] = (out_dir / f"train.{code}").open("w", encoding="utf-8", newline="\n")
+    dev_output[code] = (out_dir / f"dev.{code}").open("w", encoding="utf-8", newline="\n")
+    test_output[code] = (out_dir / f"test.{code}").open("w", encoding="utf-8", newline="\n")
+for i, en in enumerate(keep_en):
+    if i < args.num_dev:
+        output = dev_output
+    elif i < args.num_dev + args.num_test:
+        output = test_output
+    else:
+        output = train_output
     output["en"].write(en + "\n") # write english file
     for code in found_lang:
         output[code].write(table[en][code] + "\n") # write each xx language file
