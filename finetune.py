@@ -7,14 +7,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from transformers import (
+    AutoTokenizer,
     Adafactor,
     AutoModelForSeq2SeqLM,
-    AutoTokenizer,
     get_constant_schedule_with_warmup,
 )
 
 from configure import USE_CUDA
-from corpora import MixtureOfBitexts
+from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
 
 
 def cleanup():
@@ -22,55 +22,32 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def tokenize(sents, lang: str, tokenizer: AutoTokenizer, max_length: int, alt_pad_token: int = None):
-    tokenizer.src_lang = lang
-    tokens = tokenizer(
-        sents, return_tensors="pt", padding=True, truncation=True, max_length=max_length
-    )
-    if alt_pad_token is not None:
-        tokens.input_ids[tokens.input_ids == tokenizer.pad_token_id] = alt_pad_token
-    return tokens
-
-
-def prepare_tokenizer_and_model(
-    base_model: str, new_lang_codes, freeze_encoder: bool, model_dir: str
+def prepare_model(
+    base_model: str, 
+    freeze_encoder: bool
 ):
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
     model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
-
     if freeze_encoder:
         print("--> ENCODER FROZEN <--")
         for param in model.get_encoder().parameters():
             param.requires_grad = False
     else:
         print("--> encoder NOT frozen <--")
-
-    missing = [code for code in new_lang_codes if code not in tokenizer.get_vocab()]
-    if missing:
-        print("Augmenting vocabulary with:", missing)
-        tokenizer.add_special_tokens({"additional_special_tokens": missing})
-        model.resize_token_embeddings(len(tokenizer))
-
-    tokenizer.save_pretrained(model_dir)
-
     if USE_CUDA:
         torch.cuda.set_device(0)
         torch.backends.cudnn.benchmark = True
         model.cuda()
+    return model
 
-    return tokenizer, model
 
-
-def evaluate(model, dev_data, tokenizer, max_length, batches: int = 100):
+def evaluate(model, dev_data, batches: int = 100):
     model.eval()
     dev_losses = []
     with torch.no_grad():
         for _ in range(batches):
-            lang1_sents, lang2_sents, lang1, lang2 = dev_data.next_batch()
-            x = tokenize(lang1_sents, lang1, tokenizer, max_length).to(model.device)
-            y = tokenize(
-                lang2_sents, lang2, tokenizer, max_length, alt_pad_token=-100
-            ).to(model.device)
+            x, y = dev_data.next_batch()
+            x = x.to(model.device)
+            y = y.to(model.device)
             loss = model(**x, labels=y.input_ids).loss
             dev_losses.append(loss.item())
     return np.mean(dev_losses)
@@ -93,18 +70,13 @@ def finetune(
     base_model: str,
     model_dir: str,
     training_steps: int,
-    max_length: int = 128,
     report_every: int = 500,
     validate_every: int = 500,
     patience: int = 5,
     freeze_encoder: bool = False,
 ):
     print(f"Training {model_dir}")
-    new_lang_codes = train_data.get_language_codes()
-    tokenizer, model = prepare_tokenizer_and_model(
-        base_model, new_lang_codes, freeze_encoder, model_dir
-    )
-
+    model = prepare_model(base_model, freeze_encoder)
     optimizer = Adafactor(
         [p for p in model.parameters() if p.requires_grad],
         scale_parameter=False,
@@ -123,11 +95,9 @@ def finetune(
     for i in tqdm(range(training_steps)):
         try:
             model.train()
-            lang1_sents, lang2_sents, lang1, lang2 = train_data.next_batch()
-            x = tokenize(lang1_sents, lang1, tokenizer, max_length).to(model.device)
-            y = tokenize(
-                lang2_sents, lang2, tokenizer, max_length, alt_pad_token=-100
-            ).to(model.device)
+            x, y = train_data.next_batch()
+            x = x.to(model.device)
+            y = y.to(model.device)
             loss = model(**x, labels=y.input_ids).loss
             loss.backward()
             train_losses.append(loss.item())
@@ -152,7 +122,7 @@ def finetune(
 
         if i % validate_every == 0:
             print("Validating...")
-            dev_loss = evaluate(model, dev_data, tokenizer, max_length)
+            dev_loss = evaluate(model, dev_data)
             print(f"Dev loss: {dev_loss:.4f}")
             dev_plot_x.append(i)
             dev_plot_y.append(dev_loss)
@@ -194,7 +164,6 @@ def main():
         model_version += 1
     model_dir = f"{base_dir}-v{model_version}"
     os.makedirs(model_dir)
-
     train_data = MixtureOfBitexts.create_from_files(
         {
             "fr": "/mnt/storage/hopkins/data/europarl/preprocessed/train.fr",
@@ -210,10 +179,13 @@ def main():
         },
         [("en", "fr")],
         batch_size=32,
-    )
+    )       
     model_name = "facebook/nllb-200-distilled-600M"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenized_train = TokenizedMixtureOfBitexts(train_data, tokenizer, max_length=128)
+    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128)
     finetune(
-        train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
+        tokenized_train, tokenized_dev, model_name, model_dir, args.steps, freeze_encoder=False
     )
 
 

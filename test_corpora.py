@@ -200,6 +200,30 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(lang1_mask.tolist(), expected_lang1_mask.tolist())
         self.assertEqual(lang2_mask.tolist(), expected_lang2_mask.tolist())
         
+    def test_tokenized_mixture_of_bitexts_w_permutations(self):
+        text_files = {"eng_Latn": "test_files/lang1.txt", "fra_Latn": "test_files/lang2.txt"}
+        mix = MixtureOfBitexts.create_from_files(text_files, [("eng_Latn", "fra_Latn")], 3)
+        base_model = "facebook/nllb-200-distilled-600M"
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+        tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=8)
+        lang1_token_ids, lang2_token_ids, lang1_mask, lang2_mask = tmob.next_batch()
+        expected_lang1_token_ids = tensor([[256047,   1617,   7875,    228,  55501,    349, 227879, 2],
+                                           [256047,  11873,    272,  22665,      9,  28487, 248075,      2],
+                                           [256047,  13710,  18379,  43583,   2299, 248075,      2,      1]])
+        expected_lang2_token_ids = tensor([[256057,   1181,  32779,      9, 170684,    356,     82,    2],
+                                           [256057,  19945,   6622,    159,  68078, 248075,      2,   -100],
+                                           [256057,  21422,   5665,    138,   1166,  96236, 248075,      2]])
+        expected_lang1_mask = tensor([[1, 1, 1, 1, 1, 1, 1, 1],
+                                      [1, 1, 1, 1, 1, 1, 1, 1],
+                                      [1, 1, 1, 1, 1, 1, 1, 0]])
+        expected_lang2_mask = tensor([[1, 1, 1, 1, 1, 1, 1, 1],
+                                      [1, 1, 1, 1, 1, 1, 1, 0],
+                                      [1, 1, 1, 1, 1, 1, 1, 1]])
+        self.assertEqual(lang1_token_ids.tolist(), expected_lang1_token_ids.tolist())
+        self.assertEqual(lang2_token_ids.tolist(), expected_lang2_token_ids.tolist())
+        self.assertEqual(lang1_mask.tolist(), expected_lang1_mask.tolist())
+        self.assertEqual(lang2_mask.tolist(), expected_lang2_mask.tolist())
+        
 
 if __name__ == "__main__":
     unittest.main()
