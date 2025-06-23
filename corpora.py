@@ -1,7 +1,7 @@
 import random
 from typing import Dict, Tuple, List, Optional, Iterator
 from torch.utils.data import DataLoader, IterableDataset
-
+from transformers import AutoTokenizer
 
 class Bitext(IterableDataset):
     def __init__(self, lang1_file: str, lang2_file: str):
@@ -66,3 +66,36 @@ class MixtureOfBitexts:
 
     def get_language_codes(self) -> List[str]:
         return sorted({code for pair in self.keys for code in pair})
+
+
+class TokenizedMixtureOfBitexts:
+    def __init__(
+        self,
+        mixture_of_bitexts: MixtureOfBitexts,
+        tokenizer: AutoTokenizer,
+        max_length: int
+    ):
+        self.mixture_of_bitexts = mixture_of_bitexts
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+
+    def _tokenize(self, sents: List[str], lang: str, alt_pad_token: int = None):
+        self.tokenizer.src_lang = lang
+        tokens = self.tokenizer(
+            sents, return_tensors="pt", padding=True, truncation=True, max_length=self.max_length
+        )
+        if alt_pad_token is not None:
+            tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = alt_pad_token
+        return tokens
+
+    def next_batch(self):
+        lang1_sents, lang2_sents, lang1_code, lang2_code = self.mixture_of_bitexts.next_batch()
+        lang1_tokenized = self._tokenize(lang1_sents, lang1_code)
+        lang2_tokenized = self._tokenize(lang2_sents, lang2_code, alt_pad_token=-100)
+        return (lang1_tokenized['input_ids'], 
+                lang2_tokenized['input_ids'], 
+                lang1_tokenized['attention_mask'],
+                lang2_tokenized['attention_mask'])
+
+    def get_language_codes(self) -> List[str]:
+        return self.mixture_of_bitexts.get_language_codes
