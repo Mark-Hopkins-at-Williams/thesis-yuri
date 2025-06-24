@@ -1,6 +1,8 @@
 import random
 from typing import Dict, Tuple, List, Optional, Iterator
 from torch.utils.data import DataLoader, IterableDataset
+from transformers import AutoTokenizer, NllbTokenizerFast
+import torch 
 
 
 class Bitext(IterableDataset):
@@ -66,3 +68,33 @@ class MixtureOfBitexts:
 
     def get_language_codes(self) -> List[str]:
         return sorted({code for pair in self.keys for code in pair})
+
+
+class TokenizedMixtureOfBitexts:
+    def __init__(
+        self,
+        mixbitext: MixtureOfBitexts,
+        tokenizer: NllbTokenizerFast,
+        max_length: int
+    ):
+        self.mixbitext = mixbitext
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+    def next_batch(self):
+        nxtbatch = self.mixbitext.next_batch()
+        tokenizer_lang1 = self.tokenizer
+        tokenizer_lang1.src_lang = nxtbatch[2]
+        lang1_sents = list(nxtbatch[0])
+        lang2_sents = list(nxtbatch[1])
+        lang1_tokenized = tokenizer_lang1(lang1_sents, padding=True, max_length=self.max_length, truncation = True)
+        lang1_input_id = torch.tensor(lang1_tokenized['input_ids'])
+        lang1_attention_mask = torch.tensor(lang1_tokenized['attention_mask'])
+        tokenizer_lang2 = self.tokenizer
+        tokenizer_lang2.src_lang = nxtbatch[3]
+        lang2_tokenized = tokenizer_lang2(lang2_sents, padding=True, max_length=self.max_length, truncation = True)
+        lang2_input_id = torch.where(torch.tensor(lang2_tokenized['input_ids']) == 1, torch.tensor(-100), torch.tensor(lang2_tokenized['input_ids']))
+        lang2_attention_mask = torch.tensor(lang2_tokenized['attention_mask'])
+        result =(lang1_input_id, lang2_input_id, lang1_attention_mask, lang2_attention_mask)
+        return result
+    
+
