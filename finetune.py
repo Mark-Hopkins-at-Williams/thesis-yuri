@@ -4,6 +4,8 @@ import sys
 import torch
 import argparse
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from transformers import (
@@ -15,7 +17,7 @@ from transformers import (
 
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
-
+from permutations import create_random_permutation_with_fixed_points
 
 def cleanup():
     gc.collect()
@@ -140,7 +142,7 @@ def finetune(
                 print("Saving new best model.")
                 best_dev_loss = dev_loss
                 steps_since_best = 0
-                model.save_pretrained(model_dir)
+                model.save_pretrained(model_dir) # causes warning?
             else:
                 steps_since_best += 1
                 print(f"No improvement. Patience: {patience - steps_since_best}")
@@ -166,24 +168,25 @@ def main():
     os.makedirs(model_dir)
     train_data = MixtureOfBitexts.create_from_files(
         {
-            "fr": "/mnt/storage/hopkins/data/europarl/preprocessed/train.fr",
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
+            "fra_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.fr",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
         },
-        [("en", "fr")],
+        [("eng_Latn", "fra_Latn")],
         batch_size=32,
     )
     dev_data = MixtureOfBitexts.create_from_files(
         {
-            "fr": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.fr",
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
+            "fra_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.fr",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
         },
-        [("en", "fr")],
+        [("eng_Latn", "fra_Latn")],
         batch_size=32,
     )       
     model_name = "facebook/nllb-200-distilled-600M"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenized_train = TokenizedMixtureOfBitexts(train_data, tokenizer, max_length=128)
-    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128)
+    pmap = {"fra_Latn": create_random_permutation_with_fixed_points(len(tokenizer), tokenizer.all_special_ids)}
+    tokenized_train = TokenizedMixtureOfBitexts(train_data, tokenizer, max_length=128, permutation_map=pmap)
+    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128, permutation_map=pmap)
     finetune(
         tokenized_train, tokenized_dev, model_name, model_dir, args.steps, freeze_encoder=False
     )
