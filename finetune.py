@@ -29,6 +29,8 @@ def prepare_model(
     freeze_encoder: bool
 ):
     model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
+    if hasattr(model.config, "max_length"): # this should be in a GenerationConfig
+        delattr(model.config, "max_length")
     if freeze_encoder:
         print("--> ENCODER FROZEN <--")
         for param in model.get_encoder().parameters():
@@ -37,7 +39,6 @@ def prepare_model(
         print("--> encoder NOT frozen <--")
     if USE_CUDA:
         torch.cuda.set_device(0)
-        torch.backends.cudnn.benchmark = True
         model.cuda()
     return model
 
@@ -168,19 +169,19 @@ def main():
     os.makedirs(model_dir)
     train_data = MixtureOfBitexts.create_from_files(
         {
-            "fra_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.fr",
-            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
+            "fra_Latn": "data/train.fr",
+            "eng_Latn": "data/train.en",
         },
         [("eng_Latn", "fra_Latn")],
-        batch_size=32,
+        batch_size=64,
     )
     dev_data = MixtureOfBitexts.create_from_files(
         {
-            "fra_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.fr",
-            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
+            "fra_Latn": "data/dev.fr",
+            "eng_Latn": "data/dev.en",
         },
         [("eng_Latn", "fra_Latn")],
-        batch_size=32,
+        batch_size=64,
     )       
     model_name = "facebook/nllb-200-distilled-600M"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
