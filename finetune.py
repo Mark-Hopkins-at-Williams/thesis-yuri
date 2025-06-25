@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from pathlib import Path
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer,
@@ -17,7 +18,7 @@ from transformers import (
 
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
-from permutations import create_random_permutation_with_fixed_points
+from permutations import create_random_permutation_with_fixed_points, save_permutation_map
 
 def cleanup():
     gc.collect()
@@ -186,6 +187,7 @@ def main():
     model_name = "facebook/nllb-200-distilled-600M"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     pmap = {"fra_Latn": create_random_permutation_with_fixed_points(len(tokenizer), tokenizer.all_special_ids)}
+    save_permutation_map(pmap, Path(model_dir) / "permutations.json")
     tokenized_train = TokenizedMixtureOfBitexts(train_data, tokenizer, max_length=128, permutation_map=pmap)
     tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128, permutation_map=pmap)
     finetune(
