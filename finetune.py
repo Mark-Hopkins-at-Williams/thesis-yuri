@@ -22,7 +22,7 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def tokenize(sents, lang, tokenizer, max_length: int, alt_pad_token: int = None):
+def tokenize(sents, lang: str, tokenizer: AutoTokenizer, max_length: int, alt_pad_token: int = None):
     tokenizer.src_lang = lang
     tokens = tokenizer(
         sents, return_tensors="pt", padding=True, truncation=True, max_length=max_length
