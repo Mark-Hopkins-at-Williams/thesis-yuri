@@ -2,13 +2,6 @@ import json
 import random
 from typing import Dict
 
-def create_random_permutation(vocab_size):
-    destinations = list(range(vocab_size))
-    random.shuffle(destinations)
-    def permute(i):
-        return destinations[i]
-    return permute
-
 def create_random_permutation_with_fixed_points(vocab_size, fixed_points):
     p_domain = sorted(set(range(vocab_size)) - set(fixed_points))
     p_range = [t for t in p_domain]
@@ -25,28 +18,9 @@ class Permutation:
     def __call__(self, i):
         return self.permutation.get(i, i)
     
-    def inv(self, j):
-        return self.inverse.get(j, j)
-    
     def get_inverse(self):
         return Permutation(self.range, self.domain)
-        
-    def save(self, filename):
-        with open(filename, 'w') as writer:
-            for i, j in zip(self.domain, self.range):
-                writer.write(f"{i},{j}\n")
     
-    @staticmethod
-    def load(filename):        
-        dom = []
-        rng = []
-        with open(filename) as reader:
-            for line in reader:
-                i, j = line.strip().split(',')
-                dom.append(int(i))
-                rng.append(int(j))
-        return Permutation(dom, rng)
-                
 
 def save_permutation_map(pmap : Dict[str, Permutation], filename : str):
     to_serialize = dict()
@@ -73,12 +47,14 @@ if __name__ == "__main__":
     pmap = {"fra_Latn": p}
     for i in range(8):
         print(f"{i} => {p(i)}")
+    p_inv = p.get_inverse()
     for i in range(8):
-        print(f"{i} => {p.inv(i)}")
+        print(f"{i} => {p_inv(i)}")
     save_permutation_map(pmap, 'foo.json')
     pmap2 = load_permutation_map('foo.json')
     q = pmap2["fra_Latn"]
+    q_inv = q.get_inverse()
     for i in range(8):
         print(f"{i} => {q(i)}")
     for i in range(8):
-        print(f"{i} => {q.inv(i)}")
+        print(f"{i} => {q_inv(i)}")

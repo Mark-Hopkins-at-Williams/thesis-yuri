@@ -49,10 +49,3 @@ if __name__ == "__main__":
     for x in translated:
         print(x)
 
-
-def batched_translate(texts, batch_size=8, **kwargs):
-    idxs, texts2 = zip(*sorted(enumerate(texts), key=lambda p: len(p[1]), reverse=True))
-    results = []
-    for i in tqdm(range(0, len(texts2), batch_size)):
-        results.extend(translate(texts2[i : i + batch_size], **kwargs))
-    return [p for _, p in sorted(zip(idxs, results))]

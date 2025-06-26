@@ -26,6 +26,7 @@ class MixtureOfBitexts:
         bitexts: Dict[Tuple[str, str], Bitext],
         batch_size: int,
         sampling_probs: Optional[List[float]] = None,
+        only_once_thru: bool = False
     ):
         self.bitexts = bitexts
         self.keys = list(bitexts)
@@ -39,6 +40,9 @@ class MixtureOfBitexts:
         self.sampling_probs = [
             p / total for p in (sampling_probs or [1.0] * len(bitexts))
         ]
+        
+        self.only_once_thru = only_once_thru
+        self.completed_bitexts = set()
 
     def _create_iterator(
         self, key: Tuple[str, str]
@@ -52,16 +56,22 @@ class MixtureOfBitexts:
             )
         )
 
-    def next_batch(self) -> Tuple[List[str], List[str], str, str]:
-        lang_pair = random.choices(self.keys, weights=self.sampling_probs, k=1)[0]
-
-        try:
-            lang1_sents, lang2_sents = next(self.batch_iters[lang_pair])
-        except StopIteration:
-            self.batch_iters[lang_pair] = self._create_iterator(lang_pair)
-            lang1_sents, lang2_sents = next(self.batch_iters[lang_pair])
-
-        return lang1_sents, lang2_sents, lang_pair[0], lang_pair[1]
+    def next_batch(self) -> Optional[Tuple[List[str], List[str], str, str]]:
+        still_choosing = True
+        while still_choosing and len(self.completed_bitexts) < len(self.keys):
+            lang_pair = random.choices(self.keys, weights=self.sampling_probs, k=1)[0]
+            try:
+                lang1_sents, lang2_sents = next(self.batch_iters[lang_pair])
+                still_choosing = False
+            except StopIteration:
+                if self.only_once_thru:
+                    self.completed_bitexts.add(lang_pair)
+                else: # start a new iterator for the chosen bitext
+                    self.batch_iters[lang_pair] = self._create_iterator(lang_pair)                    
+        if still_choosing:
+            return None
+        else:
+            return lang1_sents, lang2_sents, lang_pair[0], lang_pair[1]
 
     @staticmethod
     def create_from_files(
@@ -69,9 +79,10 @@ class MixtureOfBitexts:
         lps: List[Tuple[str, str]],
         batch_size: int,
         sampling_probs: Optional[List[float]] = None,
+        only_once_thru: bool = False
     ) -> "MixtureOfBitexts":
         bitexts = {(l1, l2): Bitext(text_files[l1], text_files[l2]) for (l1, l2) in lps}
-        return MixtureOfBitexts(bitexts, batch_size, sampling_probs)
+        return MixtureOfBitexts(bitexts, batch_size, sampling_probs, only_once_thru)
 
     def get_language_codes(self) -> List[str]:
         return sorted({code for pair in self.keys for code in pair})
@@ -83,7 +94,7 @@ class TokenizedMixtureOfBitexts:
         mixture_of_bitexts: MixtureOfBitexts,
         tokenizer: AutoTokenizer,
         max_length: int,
-        permutation_map: Dict[str, Callable[[int], int]] = dict(),
+        permutation_map: Dict[str, Callable[[int], int]] = dict()
     ):
         self.mixture_of_bitexts = mixture_of_bitexts
         self.tokenizer = tokenizer
@@ -109,6 +120,9 @@ class TokenizedMixtureOfBitexts:
         return tokens
 
     def next_batch(self):
+        batch = self.mixture_of_bitexts.next_batch()
+        if batch is None:
+            return batch
         lang1_sents, lang2_sents, lang1_code, lang2_code = (
             self.mixture_of_bitexts.next_batch()
         )

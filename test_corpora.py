@@ -61,6 +61,7 @@ class TestUtil(unittest.TestCase):
         )
         self.assertIn(batch, [expected1, expected2])
 
+
     def test_mixture_of_bitexts2(self):
         text_files = {
             "lang1": "test_files/lang1.txt",
@@ -93,65 +94,52 @@ class TestUtil(unittest.TestCase):
         )
         self.assertIn(batch, [expected1, expected2])
 
-    """
-    def test_tokenize(self):
-        text_files = {"lang1": "test_files/lang1.txt", "lang2": "test_files/lang2.txt"}
-        mix = MixtureOfBitexts.create_from_files(text_files, [("lang1", "lang2")], 3)
-        base_model = "facebook/nllb-200-distilled-600M"
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
-        lang1_sents, lang2_sents, lang1, lang2 = mix.next_batch()
-        tokenized = tokenize(lang1_sents, lang1, tokenizer, 100)
-        expected_ids = tensor(
-            [
-                [3, 1617, 7875, 228, 55501, 349, 227879, 248075, 2],
-                [3, 11873, 272, 22665, 9, 28487, 248075, 2, 1],
-                [3, 13710, 18379, 43583, 2299, 248075, 2, 1, 1],
-            ]
+    def test_mixture_of_bitexts3(self):
+        text_files = {
+            "lang1": "test_files/lang1.txt",
+            "lang2": "test_files/lang2.txt",
+            "lang3": "test_files/lang3.txt",
+        }
+        mix = MixtureOfBitexts.create_from_files(
+            text_files, [("lang1", "lang2"), ("lang1", "lang3")], 
+            batch_size=5, only_once_thru=True
         )
-        expected_mask = tensor(
-            [
-                [1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 0],
-                [1, 1, 1, 1, 1, 1, 1, 0, 0],
-            ]
-        )
-        self.assertEqual(tokenized["input_ids"].tolist(), expected_ids.tolist())
-        self.assertEqual(tokenized["attention_mask"].tolist(), expected_mask.tolist())
-        tokens = [
-            tokenizer.convert_ids_to_tokens(seq) for seq in tokenized["input_ids"]
-        ]
-        expected_tokens = [
-            ["<unk>", "▁The", "▁cat", "▁ch", "ased", "▁the", "▁mouse", ".", "</s>"],
-            ["<unk>", "▁She", "▁re", "ads", "▁a", "▁book", ".", "</s>", "<pad>"],
-            ["<unk>", "▁They", "▁play", "▁soc", "cer", ".", "</s>", "<pad>", "<pad>"],
-        ]
-        self.assertEqual(tokens, expected_tokens)
+        counter = 0
+        batch = "not none"
+        while batch is not None:
+            batch = mix.next_batch()
+            if batch is not None:
+                counter += 1
+        self.assertEqual(counter, 8)
         
-    def test_tokenize_alt_pad(self):
-        text_files = {"eng_Latn": "test_files/lang1.txt", "fra_Latn": "test_files/lang2.txt"}
-        mix = MixtureOfBitexts.create_from_files(text_files, [("eng_Latn", "fra_Latn")], 3)
-        base_model = "facebook/nllb-200-distilled-600M"
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
-        lang1_sents, lang2_sents, lang1, lang2 = mix.next_batch()
-        tokenized = tokenize(lang1_sents, lang1, tokenizer, 100,
-                             alt_pad_token=-100)
-        expected_ids = tensor(
-            [
-                [256047, 1617, 7875, 228, 55501, 349, 227879, 248075, 2],
-                [256047, 11873, 272, 22665, 9, 28487, 248075, 2, -100],
-                [256047, 13710, 18379, 43583, 2299, 248075, 2, -100, -100],
-            ]
+    def test_mixture_of_bitexts5(self):
+        text_files = {
+            "lang1": "test_files/lang1.txt",
+            "lang2": "test_files/lang2.txt",
+            "lang3": "test_files/lang3.txt",
+        }
+        mix = MixtureOfBitexts.create_from_files(
+            text_files, [("lang1", "lang2"), ("lang1", "lang3")], 
+            batch_size=2, only_once_thru=True
         )
-        expected_mask = tensor(
-            [
-                [1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 0],
-                [1, 1, 1, 1, 1, 1, 1, 0, 0],
-            ]
+        next_batch = "not none"
+        while next_batch is not None:
+            next_batch = mix.next_batch()
+            if next_batch is not None:
+                batch = next_batch
+        expected1 = (
+            ('The chef cooked a meal.', 'They built a house.'), 
+            ('Le chef a cuisiné un repas.', 'Ils ont construit une maison.'), 
+            'lang1', 
+            'lang2'
         )
-        self.assertEqual(tokenized["input_ids"].tolist(), expected_ids.tolist())
-        self.assertEqual(tokenized["attention_mask"].tolist(), expected_mask.tolist())
-    """
+        expected2 = (
+            ('The chef cooked a meal.', 'They built a house.'), 
+            ('Der Koch hat eine Mahlzeit gekocht.', 'Sie haben ein Haus gebaut.'), 
+            'lang1', 
+            'lang3'
+        )
+        self.assertIn(batch, [expected1, expected2])
 
     def test_tokenized_mixture_of_bitexts(self):
         text_files = {
