@@ -122,13 +122,11 @@ class TokenizedMixtureOfBitexts:
     def next_batch(self):
         batch = self.mixture_of_bitexts.next_batch()
         if batch is None:
-            return batch
-        lang1_sents, lang2_sents, lang1_code, lang2_code = (
-            self.mixture_of_bitexts.next_batch()
-        )
+            return None
+        lang1_sents, lang2_sents, lang1_code, lang2_code = batch
         lang1_tokenized = self._tokenize(lang1_sents, lang1_code)
         lang2_tokenized = self._tokenize(lang2_sents, lang2_code, alt_pad_token=-100)
-        return lang1_tokenized, lang2_tokenized
+        return lang1_tokenized, lang2_tokenized, lang1_code, lang2_code
 
 
 if __name__ == "__main__":

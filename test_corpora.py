@@ -112,7 +112,7 @@ class TestUtil(unittest.TestCase):
                 counter += 1
         self.assertEqual(counter, 8)
         
-    def test_mixture_of_bitexts5(self):
+    def test_mixture_of_bitexts4(self):
         text_files = {
             "lang1": "test_files/lang1.txt",
             "lang2": "test_files/lang2.txt",
@@ -152,7 +152,7 @@ class TestUtil(unittest.TestCase):
         base_model = "facebook/nllb-200-distilled-600M"
         tokenizer = AutoTokenizer.from_pretrained(base_model)
         tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=128)
-        lang1_batch, lang2_batch = tmob.next_batch()
+        lang1_batch, lang2_batch, _, _ = tmob.next_batch()
         expected_lang1_token_ids = tensor(
             [
                 [256047, 1617, 7875, 228, 55501, 349, 227879, 248075, 2],
@@ -205,7 +205,7 @@ class TestUtil(unittest.TestCase):
         base_model = "facebook/nllb-200-distilled-600M"
         tokenizer = AutoTokenizer.from_pretrained(base_model)
         tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=8)
-        lang1_batch, lang2_batch = tmob.next_batch()
+        lang1_batch, lang2_batch, _, _ = tmob.next_batch()
         expected_lang1_token_ids = tensor(
             [
                 [256047, 1617, 7875, 228, 55501, 349, 227879, 2],
@@ -261,7 +261,7 @@ class TestUtil(unittest.TestCase):
         tmob = TokenizedMixtureOfBitexts(
             mix, tokenizer, max_length=128, permutation_map=pmap
         )
-        lang1_batch, lang2_batch = tmob.next_batch()
+        lang1_batch, lang2_batch, _, _ = tmob.next_batch()
         expected_lang1_token_ids = tensor(
             [
                 [256048, 1618, 7876, 229, 55502, 350, 227880, 248076, 3],

@@ -1,7 +1,11 @@
+import evaluate
 from pathlib import Path
+import sys
+import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
 from permutations import load_permutation_map
 
@@ -25,27 +29,56 @@ def translate(
         num_beams=num_beams,
         **kwargs
     )
+    result = result.to('cpu')
     result.apply_(permutation.get_inverse())
     return tokenizer.batch_decode(result, skip_special_tokens=True)
 
 
-if __name__ == "__main__":
+def translate_tokenized_mixture_of_bitexts(mix, model, tokenizer, pmap):         
+    if USE_CUDA:
+        model.cuda()
+    batch = mix.next_batch()  
+    translations = dict()
+    while batch is not None:
+        src, _, src_code, tgt_code = batch
+        permutation = pmap[tgt_code]
+        key = '->'.join([src_code, tgt_code])
+        if key not in translations:
+            translations[key] = []
+        translated = translate(src, tokenizer, model, tgt_code, permutation)
+        translations[key].extend(translated)
+        batch = mix.next_batch() 
+    return translations
+
+
+def evaluate_translations(candidate_translations, reference_translations):
+    bleu_calc = evaluate.load("sacrebleu")
+    chrf_calc = evaluate.load("chrf")
+    reference_translations = [[ref] for ref in reference_translations]
+    bleu_result = bleu_calc.compute(predictions = candidate_translations, references = reference_translations)
+    chrf_result = chrf_calc.compute(predictions = candidate_translations, references = reference_translations)
+    return {'bleu': round(bleu_result["score"], 3), 'chrf': round(chrf_result["score"], 3)}
+
+
+def main():
     test_mix = MixtureOfBitexts.create_from_files(
         {
             "fra_Latn": "data/test.fr",
             "eng_Latn": "data/test.en",
         },
         [("eng_Latn", "fra_Latn")],
-        batch_size=2,
+        batch_size=32,
+        only_once_thru=True
     )           
-    base_model = "facebook/nllb-200-distilled-600M"
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
-    test_data = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
-    src, tgt = test_data.next_batch()
-    model = AutoModelForSeq2SeqLM.from_pretrained("experiments/exp-v17/") 
-    pmap = load_permutation_map(Path("experiments/exp-v17/") / "permutations.json")
-    permutation = pmap["fra_Latn"]
-    translated = translate(src, tokenizer, model, "fra_Latn", permutation)
-    for x in translated:
-        print(x)
-
+    references = dict()
+    batch = test_mix.next_batch()
+    while batch is not None:
+        _, tgt, src_code, tgt_code = batch        
+        if (src_code, tgt_code) not in references:
+            references[(src_code, tgt_code)] = []        
+        references[(src_code, tgt_code)].extend(tgt)
+        batch = test_mix.next_batch()  
+    print(references)
+    
+if __name__ == "__main__":
+    main()
