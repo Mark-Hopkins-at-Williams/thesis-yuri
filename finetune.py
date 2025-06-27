@@ -12,15 +12,13 @@ import sys
 import torch
 from tqdm import tqdm
 from transformers import (
-    AutoTokenizer,
     Adafactor,
     AutoModelForSeq2SeqLM,
     get_constant_schedule_with_warmup,
 )
-import warnings
 
 from configure import USE_CUDA
-from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
+from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
 from permutations import (
     create_random_permutation_with_fixed_points,
     save_permutation_map,
@@ -33,16 +31,7 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def load_tokenizer(model_name: str):
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="`clean_up_tokenization_spaces` was not set.*",
-            category=FutureWarning,
-            module="transformers.tokenization_utils_base",
-        )
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-    return tokenizer
+
 
 def prepare_model(base_model: str, freeze_encoder: bool):
     model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
@@ -276,8 +265,8 @@ def main():
     scores = dict()
     for key in translations:
         scores[key] = evaluate_translations(
-            translations["eng_Latn->fra_Latn"], 
-            references["eng_Latn->fra_Latn"]
+            translations[key], 
+            references[key]
         )
     with open(Path(model_dir) / "scores.json", "w") as writer:
         json.dump(scores, writer)

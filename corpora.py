@@ -2,6 +2,18 @@ import random
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
 from transformers import AutoTokenizer
+import warnings
+
+def load_tokenizer(model_name: str):
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="`clean_up_tokenization_spaces` was not set.*",
+            category=FutureWarning,
+            module="transformers.tokenization_utils_base",
+        )
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+    return tokenizer
 
 
 class Bitext(IterableDataset):

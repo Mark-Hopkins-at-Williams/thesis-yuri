@@ -1,6 +1,5 @@
 import unittest
-from corpora import Bitext, MixtureOfBitexts, TokenizedMixtureOfBitexts
-from transformers import AutoTokenizer
+from corpora import load_tokenizer, Bitext, MixtureOfBitexts, TokenizedMixtureOfBitexts
 from torch import tensor
 
 
@@ -150,7 +149,7 @@ class TestUtil(unittest.TestCase):
             text_files, [("eng_Latn", "fra_Latn")], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
+        tokenizer = load_tokenizer(base_model)
         tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=128)
         lang1_batch, lang2_batch, _, _ = tmob.next_batch()
         expected_lang1_token_ids = tensor(
@@ -203,7 +202,7 @@ class TestUtil(unittest.TestCase):
             text_files, [("eng_Latn", "fra_Latn")], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
+        tokenizer = load_tokenizer(base_model)
         tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=8)
         lang1_batch, lang2_batch, _, _ = tmob.next_batch()
         expected_lang1_token_ids = tensor(
@@ -256,7 +255,7 @@ class TestUtil(unittest.TestCase):
             text_files, [("eng_Latn", "fra_Latn")], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
+        tokenizer = load_tokenizer(base_model)
         pmap = {"eng_Latn": lambda x: x + 1, "fra_Latn": lambda x: x + 2}
         tmob = TokenizedMixtureOfBitexts(
             mix, tokenizer, max_length=128, permutation_map=pmap
