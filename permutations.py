@@ -1,7 +1,7 @@
 import random
 import json
 
-class create_random_permutation_with_fixed_points:
+class CreateRandomPermutationWithFixedPoints:
     def __init__(self, num:int, fixed_points):
         self.num = num
         self.fixed_points = fixed_points
@@ -18,10 +18,10 @@ class create_random_permutation_with_fixed_points:
                 self.inverse_dict[self.result_dict[i]] = i        
         
     def __call__(self, num):
-        return self.result_dict[num]
+        return self.result_dict.get(num, num)
     
     def get_inverse(self):
-        q = create_random_permutation_with_fixed_points(self.num, self.fixed_points)
+        q = CreateRandomPermutationWithFixedPoints(self.num, self.fixed_points)
         q.result_dict = self.inverse_dict
         q.inverse_dict = self.result_dict
         return q
@@ -48,7 +48,7 @@ def load_permutation_map(filename):
         data_dict = json.load(f)
         data = {}
         for key,value in data_dict.items():
-            obj = create_random_permutation_with_fixed_points(
+            obj = CreateRandomPermutationWithFixedPoints(
                 num = value["rng"],
                 fixed_points = value["fixed points"]
             )
@@ -57,13 +57,7 @@ def load_permutation_map(filename):
             data[key] = obj
         return data
 
-pmap = {"eng_Latn": create_random_permutation_with_fixed_points(8, [0, 1, 2, 7]), "fra_Latn": create_random_permutation_with_fixed_points(8, [0, 1, 2, 7])}
 
-save_permutation_map(pmap, 'foo.json')
-pmap2 = load_permutation_map('foo.json')
-
-for i in range(8):
-    print(f"{i} => {pmap2["eng_Latn"](i)}")
 
 
 

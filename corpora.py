@@ -85,7 +85,6 @@ class TokenizedMixtureOfBitexts:
 
     def _tokenize(self, sents: List[str], lang: str, alt_pad_token: int = None):
         self.tokenizer.src_lang = lang
-        max_id = tokenizer.vocab_size - 1
         tokens = self.tokenizer(
             sents, return_tensors="pt", padding=True, truncation=True, max_length=self.max_length
         )
@@ -93,24 +92,15 @@ class TokenizedMixtureOfBitexts:
             tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = alt_pad_token
         if self.permutation_map is not None:
             if lang in self.permutation_map.keys():
-                max_id = tokenizer.vocab_size - 1
-                print(max_id)
-                if isinstance(self.permutation_map[lang], create_random_permutation_with_fixed_points):
-                    pmap = self.permutation_map[lang]
-                else: 
-                    pmap = create_random_permutation_with_fixed_points(max_id, [])
-                    for i in pmap.result_dict.keys():
-                        pmap.result_dict[i] =  self.permutation_map[lang](i)%max_id
+                pmap_lang = self.permutation_map[lang]
                 new_tokens = []
                 for tokenized_sent in tokens['input_ids']:
                     new_sent = []
                     for token_id in tokenized_sent:
-                        if (int(token_id)!=-100):
-                            new_sent.append(pmap(int(token_id)))
-                        else:
-                            new_sent.append(self.permutation_map[lang](-100))
+                        new_sent.append(pmap_lang(int(token_id)))
                     new_tokens.append(new_sent)
                 tokens['input_ids'] = torch.tensor(new_tokens)
+                
         return tokens
 
     def next_batch(self):
@@ -125,4 +115,20 @@ class TokenizedMixtureOfBitexts:
     def get_language_codes(self) -> List[str]:
         return self.mixture_of_bitexts.get_language_codes
 
+
+text_files = {"eng_Latn": "test_files/lang1.txt", "fra_Latn": "test_files/lang2.txt"}
+
+mix = MixtureOfBitexts.create_from_files(text_files, [("eng_Latn", "fra_Latn")], 3)
+
+base_model = "facebook/nllb-200-distilled-600M"; tokenizer = AutoTokenizer.from_pretrained(base_model)
+ 
+tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
+
+tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "fra_Latn"; fra_vocab = tokenizer2.vocab_size
+
+pmap = {"eng_Latn": CreateRandomPermutationWithFixedPoints(eng_vocab, []), "fra_Latn": CreateRandomPermutationWithFixedPoints(fra_vocab, [])}
+
+tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=128, permutation_map=pmap)
+
+print(tmob.next_batch())
 

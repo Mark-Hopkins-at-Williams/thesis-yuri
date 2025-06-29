@@ -224,8 +224,14 @@ def main():
     freeze_encoder=False,
     model_dir=model_dir,
     )
-    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128)
-    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128)
+    tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
+    tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "pol_Latn"; pol_vocab = tokenizer2.vocab_size
+    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, [])
+    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, [])
+    pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
+    save_permutation_map(pmap, "pmap.json")
+    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
+    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128, permutation_map=pmap)
     finetune(
         model, tokenizer, train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
     )
