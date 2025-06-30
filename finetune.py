@@ -14,7 +14,8 @@ from transformers import (
 )
 
 from configure import USE_CUDA
-from corpora import MixtureOfBitexts
+from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
+from permutations import *
 
 
 def cleanup():
@@ -66,12 +67,16 @@ def evaluate(model, dev_data, tokenizer, max_length, batches: int = 100):
     dev_losses = []
     with torch.no_grad():
         for _ in range(batches):
-            lang1_sents, lang2_sents, lang1, lang2 = dev_data.next_batch()
-            x = tokenize(lang1_sents, lang1, tokenizer, max_length).to(model.device)
-            y = tokenize(
-                lang2_sents, lang2, tokenizer, max_length, alt_pad_token=-100
-            ).to(model.device)
-            loss = model(**x, labels=y.input_ids).loss
+            x_input_ids, y_input_ids, x_mask, y_mask = dev_data.next_batch()
+            x = {
+                "input_ids": x_input_ids.to(model.device),
+                "attention_mask": x_mask.to(model.device) 
+                }
+            y = {
+                "input_ids": y_input_ids.to(model.device),
+                "attention_mask": y_mask.to(model.device) 
+                }
+            loss = model(**x, labels=y["input_ids"]).loss
             dev_losses.append(loss.item())
     return np.mean(dev_losses)
 
@@ -88,6 +93,8 @@ def plot_losses(train_x, train_y, dev_x, dev_y, out_path: str):
 
 
 def finetune(
+    model,
+    tokenizer,
     train_data,
     dev_data,
     base_model: str,
@@ -100,10 +107,6 @@ def finetune(
     freeze_encoder: bool = False,
 ):
     print(f"Training {model_dir}")
-    new_lang_codes = train_data.get_language_codes()
-    tokenizer, model = prepare_tokenizer_and_model(
-        base_model, new_lang_codes, freeze_encoder, model_dir
-    )
 
     optimizer = Adafactor(
         [p for p in model.parameters() if p.requires_grad],
@@ -123,12 +126,16 @@ def finetune(
     for i in tqdm(range(training_steps)):
         try:
             model.train()
-            lang1_sents, lang2_sents, lang1, lang2 = train_data.next_batch()
-            x = tokenize(lang1_sents, lang1, tokenizer, max_length).to(model.device)
-            y = tokenize(
-                lang2_sents, lang2, tokenizer, max_length, alt_pad_token=-100
-            ).to(model.device)
-            loss = model(**x, labels=y.input_ids).loss
+            x_input_ids, y_input_ids, x_mask, y_mask = train_data.next_batch()
+            x = {
+                "input_ids": x_input_ids.to(model.device),
+                "attention_mask": x_mask.to(model.device) 
+                }
+            y = {
+                "input_ids": y_input_ids.to(model.device),
+                "attention_mask": y_mask.to(model.device) 
+                }
+            loss = model(**x, labels=y["input_ids"]).loss
             loss.backward()
             train_losses.append(loss.item())
             optimizer.step()
@@ -195,25 +202,52 @@ def main():
     model_dir = f"{base_dir}-v{model_version}"
     os.makedirs(model_dir)
 
-    train_data = MixtureOfBitexts.create_from_files(
+    raw_train_data = MixtureOfBitexts.create_from_files(
         {
-            "fr": "/mnt/storage/hopkins/data/europarl/preprocessed/train.fr",
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
+            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.pl",
         },
-        [("en", "fr")],
+        [("eng_Latn", "pol_Latn")],
         batch_size=32,
     )
-    dev_data = MixtureOfBitexts.create_from_files(
+    raw_dev_data = MixtureOfBitexts.create_from_files(
         {
-            "fr": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.fr",
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
+            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.pl",
         },
-        [("en", "fr")],
+        [("eng_Latn", "pol_Latn")],
         batch_size=32,
     )
     model_name = "facebook/nllb-200-distilled-600M"
+    tokenizer, model = prepare_tokenizer_and_model(
+    base_model=model_name,
+    new_lang_codes=raw_train_data.get_language_codes(),
+    freeze_encoder=False,
+    model_dir=model_dir,
+    )
+    base_model = model_name
+    tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
+    tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "pol_Latn"; pol_vocab = tokenizer2.vocab_size
+    fixed_en = [
+    tokenizer1.pad_token_id,
+    tokenizer1.eos_token_id,
+    tokenizer1.unk_token_id,
+    tokenizer1.lang_code_to_id["eng_Latn"]
+    ]
+    fixed_pl = [
+    tokenizer2.pad_token_id,
+    tokenizer2.eos_token_id,
+    tokenizer2.unk_token_id,
+    tokenizer2.lang_code_to_id["pol_Latn"]
+    ]
+    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, fixed_en)
+    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, fixed_pl)
+    pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
+    save_permutation_map(pmap, "pmap.json")
+    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
+    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128, permutation_map=pmap)
     finetune(
-        train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
+        model, tokenizer, train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
     )
 
 

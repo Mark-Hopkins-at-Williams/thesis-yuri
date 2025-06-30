@@ -2,6 +2,8 @@ import random
 from typing import Dict, Tuple, List, Optional, Iterator
 from torch.utils.data import DataLoader, IterableDataset
 from transformers import AutoTokenizer
+from permutations import *
+import torch
 
 class Bitext(IterableDataset):
     def __init__(self, lang1_file: str, lang2_file: str):
@@ -73,11 +75,13 @@ class TokenizedMixtureOfBitexts:
         self,
         mixture_of_bitexts: MixtureOfBitexts,
         tokenizer: AutoTokenizer,
-        max_length: int
+        max_length: int,
+        permutation_map: Optional[Dict] = None
     ):
         self.mixture_of_bitexts = mixture_of_bitexts
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.permutation_map = permutation_map
 
     def _tokenize(self, sents: List[str], lang: str, alt_pad_token: int = None):
         self.tokenizer.src_lang = lang
@@ -86,6 +90,18 @@ class TokenizedMixtureOfBitexts:
         )
         if alt_pad_token is not None:
             tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = alt_pad_token
+        if self.permutation_map is not None:
+            if lang in self.permutation_map.keys():
+                print(f"Applying permutation for lang = {lang}")
+                pmap_lang = self.permutation_map[lang]
+                new_tokens = []
+                for tokenized_sent in tokens['input_ids']:
+                    new_sent = []
+                    for token_id in tokenized_sent:
+                        new_sent.append(pmap_lang(int(token_id)))
+                    new_tokens.append(new_sent)
+                tokens['input_ids'] = torch.tensor(new_tokens)
+                
         return tokens
 
     def next_batch(self):
@@ -99,3 +115,6 @@ class TokenizedMixtureOfBitexts:
 
     def get_language_codes(self) -> List[str]:
         return self.mixture_of_bitexts.get_language_codes
+
+
+
