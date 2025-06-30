@@ -1,21 +1,28 @@
-import os
+import argparse
 import gc
+import json
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from pathlib import Path
 import sys
 import torch
-import argparse
-import numpy as np
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from transformers import (
     Adafactor,
     AutoModelForSeq2SeqLM,
-    AutoTokenizer,
     get_constant_schedule_with_warmup,
 )
 
 from configure import USE_CUDA
-from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
-from permutations import *
+from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
+from permutations import (
+    create_random_permutation_with_fixed_points,
+    save_permutation_map,
+)
 
 
 def cleanup():
@@ -23,60 +30,33 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def tokenize(sents, lang: str, tokenizer: AutoTokenizer, max_length: int, alt_pad_token: int = None):
-    tokenizer.src_lang = lang
-    tokens = tokenizer(
-        sents, return_tensors="pt", padding=True, truncation=True, max_length=max_length
-    )
-    if alt_pad_token is not None:
-        tokens.input_ids[tokens.input_ids == tokenizer.pad_token_id] = alt_pad_token
-    return tokens
 
 
-def prepare_tokenizer_and_model(
-    base_model: str, new_lang_codes, freeze_encoder: bool, model_dir: str
-):
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+def prepare_model(base_model: str, freeze_encoder: bool):
     model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
-
+    if hasattr(model.config, "max_length"):  # this should be in a GenerationConfig
+        delattr(model.config, "max_length")
     if freeze_encoder:
         print("--> ENCODER FROZEN <--")
         for param in model.get_encoder().parameters():
             param.requires_grad = False
     else:
         print("--> encoder NOT frozen <--")
-
-    missing = [code for code in new_lang_codes if code not in tokenizer.get_vocab()]
-    if missing:
-        print("Augmenting vocabulary with:", missing)
-        tokenizer.add_special_tokens({"additional_special_tokens": missing})
-        model.resize_token_embeddings(len(tokenizer))
-
-    tokenizer.save_pretrained(model_dir)
-
     if USE_CUDA:
         torch.cuda.set_device(0)
-        torch.backends.cudnn.benchmark = True
         model.cuda()
+    return model
 
-    return tokenizer, model
 
-
-def evaluate(model, dev_data, tokenizer, max_length, batches: int = 100):
+def evaluate(model, dev_data, batches: int = 100):
     model.eval()
     dev_losses = []
     with torch.no_grad():
         for _ in range(batches):
-            x_input_ids, y_input_ids, x_mask, y_mask = dev_data.next_batch()
-            x = {
-                "input_ids": x_input_ids.to(model.device),
-                "attention_mask": x_mask.to(model.device) 
-                }
-            y = {
-                "input_ids": y_input_ids.to(model.device),
-                "attention_mask": y_mask.to(model.device) 
-                }
-            loss = model(**x, labels=y["input_ids"]).loss
+            x, y, _, _ = dev_data.next_batch()
+            x = x.to(model.device)
+            y = y.to(model.device)
+            loss = model(**x, labels=y.input_ids).loss
             dev_losses.append(loss.item())
     return np.mean(dev_losses)
 
@@ -93,21 +73,18 @@ def plot_losses(train_x, train_y, dev_x, dev_y, out_path: str):
 
 
 def finetune(
-    model,
-    tokenizer,
     train_data,
     dev_data,
     base_model: str,
     model_dir: str,
     training_steps: int,
-    max_length: int = 128,
     report_every: int = 500,
     validate_every: int = 500,
     patience: int = 5,
     freeze_encoder: bool = False,
 ):
     print(f"Training {model_dir}")
-
+    model = prepare_model(base_model, freeze_encoder)
     optimizer = Adafactor(
         [p for p in model.parameters() if p.requires_grad],
         scale_parameter=False,
@@ -126,16 +103,10 @@ def finetune(
     for i in tqdm(range(training_steps)):
         try:
             model.train()
-            x_input_ids, y_input_ids, x_mask, y_mask = train_data.next_batch()
-            x = {
-                "input_ids": x_input_ids.to(model.device),
-                "attention_mask": x_mask.to(model.device) 
-                }
-            y = {
-                "input_ids": y_input_ids.to(model.device),
-                "attention_mask": y_mask.to(model.device) 
-                }
-            loss = model(**x, labels=y["input_ids"]).loss
+            x, y, _, _ = train_data.next_batch()
+            x = x.to(model.device)
+            y = y.to(model.device)
+            loss = model(**x, labels=y.input_ids).loss
             loss.backward()
             train_losses.append(loss.item())
             optimizer.step()
@@ -159,7 +130,7 @@ def finetune(
 
         if i % validate_every == 0:
             print("Validating...")
-            dev_loss = evaluate(model, dev_data, tokenizer, max_length)
+            dev_loss = evaluate(model, dev_data)
             print(f"Dev loss: {dev_loss:.4f}")
             dev_plot_x.append(i)
             dev_plot_y.append(dev_loss)
@@ -201,54 +172,104 @@ def main():
         model_version += 1
     model_dir = f"{base_dir}-v{model_version}"
     os.makedirs(model_dir)
-
-    raw_train_data = MixtureOfBitexts.create_from_files(
+    train_data = MixtureOfBitexts.create_from_files(
         {
-            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
-            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.pl",
+            "pol_Latn": "data/train.pl",
+            "deu_Latn": "data/train.de",
+            "eng_Latn": "data/train.en",
         },
-        [("eng_Latn", "pol_Latn")],
-        batch_size=32,
+        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
+        batch_size=64,
     )
-    raw_dev_data = MixtureOfBitexts.create_from_files(
+    dev_data = MixtureOfBitexts.create_from_files(
         {
-            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
-            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.pl",
+            "pol_Latn": "data/dev.pl",
+            "deu_Latn": "data/dev.de",
+            "eng_Latn": "data/dev.en",
         },
-        [("eng_Latn", "pol_Latn")],
-        batch_size=32,
+        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
+        batch_size=64,
     )
     model_name = "facebook/nllb-200-distilled-600M"
-    tokenizer, model = prepare_tokenizer_and_model(
-    base_model=model_name,
-    new_lang_codes=raw_train_data.get_language_codes(),
-    freeze_encoder=False,
-    model_dir=model_dir,
+    tokenizer = load_tokenizer(model_name)
+    pmap = {
+        "pol_Latn": create_random_permutation_with_fixed_points(
+            len(tokenizer), tokenizer.all_special_ids
+        ),
+        "deu_Latn": create_random_permutation_with_fixed_points(
+            len(tokenizer), tokenizer.all_special_ids
+        )
+    }
+    save_permutation_map(pmap, Path(model_dir) / "permutations.json")
+    tokenized_train = TokenizedMixtureOfBitexts(
+        train_data, tokenizer, max_length=128, permutation_map=pmap
     )
-    base_model = model_name
-    tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
-    tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "pol_Latn"; pol_vocab = tokenizer2.vocab_size
-    fixed_en = [
-    tokenizer1.pad_token_id,
-    tokenizer1.eos_token_id,
-    tokenizer1.unk_token_id,
-    tokenizer1.lang_code_to_id["eng_Latn"]
-    ]
-    fixed_pl = [
-    tokenizer2.pad_token_id,
-    tokenizer2.eos_token_id,
-    tokenizer2.unk_token_id,
-    tokenizer2.lang_code_to_id["pol_Latn"]
-    ]
-    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, fixed_en)
-    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, fixed_pl)
-    pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
-    save_permutation_map(pmap, "pmap.json")
-    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
-    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128, permutation_map=pmap)
+    tokenized_dev = TokenizedMixtureOfBitexts(
+        dev_data, tokenizer, max_length=128, permutation_map=pmap
+    )
     finetune(
-        model, tokenizer, train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
+        tokenized_train,
+        tokenized_dev,
+        model_name,
+        model_dir,
+        args.steps,
+        freeze_encoder=False,
     )
+
+    # test_mix = MixtureOfBitexts.create_from_files(
+    #     {
+    #         "pol_Latn": "data/test.pl",
+    #         "deu_Latn": "data/test.de",
+    #         "eng_Latn": "data/test.en",
+    #     },
+    #     [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
+    #     batch_size=32,
+    #     only_once_thru=True,
+    # )
+    # tokenized_test = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
+    # model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+    # if USE_CUDA:
+    #     model.cuda()
+    #translations = translate_tokenized_mixture_of_bitexts(
+    #    tokenized_test, model, tokenizer, pmap
+    #)
+    #with open(Path(model_dir) / "translations.json", "w") as writer:
+    #    json.dump(translations, writer)
+    #print("Translations complete.")
+
+    test_data = MixtureOfBitexts.create_from_files(
+        {
+            "fra_Latn": "data/test.fr",
+            "deu_Latn": "data/test.de",
+            "eng_Latn": "data/test.en",
+        },
+        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
+        batch_size=32,
+        only_once_thru=True,
+    )
+    references = dict()
+    batch = test_data.next_batch()
+    while batch is not None:
+        _, tgt, src_code, tgt_code = batch
+        key = "->".join([src_code, tgt_code])
+        if key not in references:
+            references[key] = []
+        references[key].extend(tgt)
+        batch = test_data.next_batch()
+    with open(Path(model_dir) / "references.json", "w") as writer:
+        json.dump(references, writer)
+    print("References complete.")
+
+
+    #scores = dict()
+    #for key in translations:
+    #    scores[key] = evaluate_translations(
+    #        translations[key], 
+    #        references[key]
+    #    )
+    #with open(Path(model_dir) / "scores.json", "w") as writer:
+    #    json.dump(scores, writer)
+    #print("Evaluation complete.")    
 
 
 if __name__ == "__main__":
