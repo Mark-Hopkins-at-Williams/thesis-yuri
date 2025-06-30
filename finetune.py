@@ -15,7 +15,7 @@ from transformers import (
 
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
-from permutations import *
+from permutations import create_random_permutation_with_fixed_points
 
 
 def cleanup():
@@ -240,8 +240,8 @@ def main():
     tokenizer2.unk_token_id,
     tokenizer2.lang_code_to_id["pol_Latn"]
     ]
-    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, fixed_en)
-    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, fixed_pl)
+    pmap_en = create_random_permutation_with_fixed_points(eng_vocab, fixed_en)
+    pmap_pl = create_random_permutation_with_fixed_points(pol_vocab, fixed_pl)
     pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
     save_permutation_map(pmap, "pmap.json")
     train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
