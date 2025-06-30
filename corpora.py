@@ -92,6 +92,7 @@ class TokenizedMixtureOfBitexts:
             tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = alt_pad_token
         if self.permutation_map is not None:
             if lang in self.permutation_map.keys():
+                print(f"Applying permutation for lang = {lang}")
                 pmap_lang = self.permutation_map[lang]
                 new_tokens = []
                 for tokenized_sent in tokens['input_ids']:
@@ -116,19 +117,4 @@ class TokenizedMixtureOfBitexts:
         return self.mixture_of_bitexts.get_language_codes
 
 
-text_files = {"eng_Latn": "test_files/lang1.txt", "fra_Latn": "test_files/lang2.txt"}
-
-mix = MixtureOfBitexts.create_from_files(text_files, [("eng_Latn", "fra_Latn")], 3)
-
-base_model = "facebook/nllb-200-distilled-600M"; tokenizer = AutoTokenizer.from_pretrained(base_model)
- 
-tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
-
-tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "fra_Latn"; fra_vocab = tokenizer2.vocab_size
-
-pmap = {"eng_Latn": CreateRandomPermutationWithFixedPoints(eng_vocab, []), "fra_Latn": CreateRandomPermutationWithFixedPoints(fra_vocab, [])}
-
-tmob = TokenizedMixtureOfBitexts(mix, tokenizer, max_length=128, permutation_map=pmap)
-
-print(tmob.next_batch())
 

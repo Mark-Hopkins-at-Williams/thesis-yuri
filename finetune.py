@@ -15,6 +15,7 @@ from transformers import (
 
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
+from permutations import *
 
 
 def cleanup():
@@ -203,18 +204,18 @@ def main():
 
     raw_train_data = MixtureOfBitexts.create_from_files(
         {
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
-            "pl": "/mnt/storage/hopkins/data/europarl/preprocessed/train.pl",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
+            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.pl",
         },
-        [("en", "pl")],
+        [("eng_Latn", "pol_Latn")],
         batch_size=32,
     )
     raw_dev_data = MixtureOfBitexts.create_from_files(
         {
-            "en": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
-            "pl": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.pl",
+            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.en",
+            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/dev.pl",
         },
-        [("en", "pl")],
+        [("eng_Latn", "pol_Latn")],
         batch_size=32,
     )
     model_name = "facebook/nllb-200-distilled-600M"
@@ -224,10 +225,23 @@ def main():
     freeze_encoder=False,
     model_dir=model_dir,
     )
+    base_model = model_name
     tokenizer1 = AutoTokenizer.from_pretrained(base_model); tokenizer1.src_lang = "eng_Latn"; eng_vocab = tokenizer1.vocab_size
     tokenizer2 = AutoTokenizer.from_pretrained(base_model); tokenizer2.src_lang = "pol_Latn"; pol_vocab = tokenizer2.vocab_size
-    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, [])
-    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, [])
+    fixed_en = [
+    tokenizer1.pad_token_id,
+    tokenizer1.eos_token_id,
+    tokenizer1.unk_token_id,
+    tokenizer1.lang_code_to_id["eng_Latn"]
+    ]
+    fixed_pl = [
+    tokenizer2.pad_token_id,
+    tokenizer2.eos_token_id,
+    tokenizer2.unk_token_id,
+    tokenizer2.lang_code_to_id["pol_Latn"]
+    ]
+    pmap_en = CreateRandomPermutationWithFixedPoints(eng_vocab, fixed_en)
+    pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, fixed_pl)
     pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
     save_permutation_map(pmap, "pmap.json")
     train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
