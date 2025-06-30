@@ -148,7 +148,7 @@ def finetune(
                 print("Saving new best model.")
                 best_dev_loss = dev_loss
                 steps_since_best = 0
-                model.save_pretrained(model_dir)  # causes warning?
+                model.save_pretrained(model_dir)
             else:
                 steps_since_best += 1
                 print(f"No improvement. Patience: {patience - steps_since_best}")
@@ -174,26 +174,26 @@ def main():
     os.makedirs(model_dir)
     train_data = MixtureOfBitexts.create_from_files(
         {
-            "fra_Latn": "data/train.fr",
+            "pol_Latn": "data/train.pl",
             "deu_Latn": "data/train.de",
             "eng_Latn": "data/train.en",
         },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
+        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
         batch_size=64,
     )
     dev_data = MixtureOfBitexts.create_from_files(
         {
-            "fra_Latn": "data/dev.fr",
+            "pol_Latn": "data/dev.pl",
             "deu_Latn": "data/dev.de",
             "eng_Latn": "data/dev.en",
         },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
+        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
         batch_size=64,
     )
     model_name = "facebook/nllb-200-distilled-600M"
     tokenizer = load_tokenizer(model_name)
     pmap = {
-        "fra_Latn": create_random_permutation_with_fixed_points(
+        "pol_Latn": create_random_permutation_with_fixed_points(
             len(tokenizer), tokenizer.all_special_ids
         ),
         "deu_Latn": create_random_permutation_with_fixed_points(
@@ -216,20 +216,20 @@ def main():
         freeze_encoder=False,
     )
 
-    test_mix = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/test.fr",
-            "deu_Latn": "data/test.de",
-            "eng_Latn": "data/test.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=32,
-        only_once_thru=True,
-    )
-    tokenized_test = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
-    if USE_CUDA:
-        model.cuda()
+    # test_mix = MixtureOfBitexts.create_from_files(
+    #     {
+    #         "pol_Latn": "data/test.pl",
+    #         "deu_Latn": "data/test.de",
+    #         "eng_Latn": "data/test.en",
+    #     },
+    #     [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
+    #     batch_size=32,
+    #     only_once_thru=True,
+    # )
+    # tokenized_test = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
+    # model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+    # if USE_CUDA:
+    #     model.cuda()
     #translations = translate_tokenized_mixture_of_bitexts(
     #    tokenized_test, model, tokenizer, pmap
     #)
@@ -237,7 +237,7 @@ def main():
     #    json.dump(translations, writer)
     #print("Translations complete.")
 
-    test_mix = MixtureOfBitexts.create_from_files(
+    test_data = MixtureOfBitexts.create_from_files(
         {
             "fra_Latn": "data/test.fr",
             "deu_Latn": "data/test.de",
@@ -248,14 +248,14 @@ def main():
         only_once_thru=True,
     )
     references = dict()
-    batch = test_mix.next_batch()
+    batch = test_data.next_batch()
     while batch is not None:
         _, tgt, src_code, tgt_code = batch
         key = "->".join([src_code, tgt_code])
         if key not in references:
             references[key] = []
         references[key].extend(tgt)
-        batch = test_mix.next_batch()
+        batch = test_data.next_batch()
     with open(Path(model_dir) / "references.json", "w") as writer:
         json.dump(references, writer)
     print("References complete.")
