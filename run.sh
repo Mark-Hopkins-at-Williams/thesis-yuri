@@ -6,4 +6,6 @@
 #SBATCH -o logs/log_%j.out  
 #SBATCH -e logs/log_%j.err
 #SBATCH --gres=gpu:1
-python finetune.py --model_dir experiments/exp --steps 30000
+python finetune.py --config configs/experiment1.bi1.256.json
+python finetune.py --config configs/experiment1.bi2.256.json
+python finetune.py --config configs/experiment1.multi.256.json

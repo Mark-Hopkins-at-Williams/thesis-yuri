@@ -44,6 +44,7 @@ def translate_tokenized_mixture_of_bitexts(mix, model, tokenizer, pmap):
         permutation = pmap[tgt_code]
         key = '->'.join([src_code, tgt_code])
         if key not in translations:
+            print(f'new key: {key}')
             translations[key] = []
         translated = translate(src, tokenizer, model, tgt_code, permutation)
         translations[key].extend(translated)

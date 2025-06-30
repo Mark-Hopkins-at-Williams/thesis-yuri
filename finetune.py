@@ -2,12 +2,12 @@ import argparse
 import gc
 import json
 import matplotlib
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from pathlib import Path
+import shutil
 import sys
 import torch
 from tqdm import tqdm
@@ -29,8 +29,6 @@ from validate import translate_tokenized_mixture_of_bitexts, evaluate_translatio
 def cleanup():
     gc.collect()
     torch.cuda.empty_cache()
-
-
 
 
 def prepare_model(base_model: str, freeze_encoder: bool):
@@ -161,46 +159,53 @@ def finetune(
 def main():
     parser = argparse.ArgumentParser(description="Finetune NLLB model.")
     parser.add_argument(
-        "--model_dir", type=str, required=True, help="Directory to save finetuned model"
+        "--config", type=str, required=True, help="Directory to save finetuned model"
     )
-    parser.add_argument("--steps", type=int, default=60_000, help="Training steps")
     args = parser.parse_args()
 
+    with open(args.config) as reader:
+        config = json.load(reader)
+
+    all_corpora = config["corpora"]
+    train_corpora = {key: all_corpora[key]["train"] for key in all_corpora}
+    dev_corpora = {key: all_corpora[key]["dev"] for key in all_corpora}
+    test_corpora = {key: all_corpora[key]["test"] for key in all_corpora}
+    params = config["finetuning_parameters"]
+    train_bitexts = [(b["src"], b["tgt"], b["train_lines"]) for b in config["bitexts"]]
+    devtest_bitexts = [(b["src"], b["tgt"], None) for b in config["bitexts"]]
+    
     # Create unique model directory
-    base_dir = args.model_dir
+    base_dir = config["model_dir"]
     model_version = 0
     while os.path.exists(f"{base_dir}-v{model_version}"):
         model_version += 1
     model_dir = f"{base_dir}-v{model_version}"
     os.makedirs(model_dir)
+    shutil.copy(args.config, Path(model_dir) / Path(args.config).name)
+
     train_data = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/train.fr",
-            "deu_Latn": "data/train.de",
-            "eng_Latn": "data/train.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=64,
+        train_corpora, train_bitexts, batch_size=params["batch_size"]
     )
     dev_data = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/dev.fr",
-            "deu_Latn": "data/dev.de",
-            "eng_Latn": "data/dev.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=64,
+        dev_corpora, devtest_bitexts, batch_size=params["batch_size"]
     )
-    model_name = "facebook/nllb-200-distilled-600M"
+    model_name = params["base_model"]
     tokenizer = load_tokenizer(model_name)
-    pmap = {
-        "fra_Latn": create_random_permutation_with_fixed_points(
-            len(tokenizer), tokenizer.all_special_ids
-        ),
-        "deu_Latn": create_random_permutation_with_fixed_points(
-            len(tokenizer), tokenizer.all_special_ids
-        )
-    }
+
+    # Create the permutations
+    permutations = dict()
+    pmap = dict()
+    for language in all_corpora:
+        permutation_index = all_corpora[language]["permutation"]
+        if permutation_index > 0:
+            if permutation_index not in permutations:
+                permutations[permutation_index] = (
+                    create_random_permutation_with_fixed_points(
+                        len(tokenizer), tokenizer.all_special_ids
+                    )
+                )
+            pmap[language] = permutations[permutation_index]
+        
     save_permutation_map(pmap, Path(model_dir) / "permutations.json")
     tokenized_train = TokenizedMixtureOfBitexts(
         train_data, tokenizer, max_length=128, permutation_map=pmap
@@ -213,21 +218,15 @@ def main():
         tokenized_dev,
         model_name,
         model_dir,
-        args.steps,
+        params['num_steps'],
         freeze_encoder=False,
     )
 
-    test_mix = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/test.fr",
-            "deu_Latn": "data/test.de",
-            "eng_Latn": "data/test.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=32,
-        only_once_thru=True,
+    test_data = MixtureOfBitexts.create_from_files(
+        test_corpora, devtest_bitexts, batch_size=params["batch_size"],
+        only_once_thru=True
     )
-    tokenized_test = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
+    tokenized_test = TokenizedMixtureOfBitexts(test_data, tokenizer, max_length=128)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
     if USE_CUDA:
         model.cuda()
@@ -238,39 +237,30 @@ def main():
         json.dump(translations, writer)
     print("Translations complete.")
 
-    test_mix = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/test.fr",
-            "deu_Latn": "data/test.de",
-            "eng_Latn": "data/test.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=32,
-        only_once_thru=True,
+    test_data = MixtureOfBitexts.create_from_files(
+        test_corpora, devtest_bitexts, batch_size=params["batch_size"],
+        only_once_thru=True
     )
+
     references = dict()
-    batch = test_mix.next_batch()
+    batch = test_data.next_batch()
     while batch is not None:
         _, tgt, src_code, tgt_code = batch
         key = "->".join([src_code, tgt_code])
         if key not in references:
             references[key] = []
         references[key].extend(tgt)
-        batch = test_mix.next_batch()
+        batch = test_data.next_batch()
     with open(Path(model_dir) / "references.json", "w") as writer:
         json.dump(references, writer)
     print("References complete.")
 
-
     scores = dict()
     for key in translations:
-        scores[key] = evaluate_translations(
-            translations[key], 
-            references[key]
-        )
+        scores[key] = evaluate_translations(translations[key], references[key])
     with open(Path(model_dir) / "scores.json", "w") as writer:
         json.dump(scores, writer)
-    print("Evaluation complete.")    
+    print("Evaluation complete.")
 
 
 if __name__ == "__main__":

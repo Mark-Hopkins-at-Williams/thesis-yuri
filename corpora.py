@@ -17,14 +17,20 @@ def load_tokenizer(model_name: str):
 
 
 class Bitext(IterableDataset):
-    def __init__(self, lang1_file: str, lang2_file: str):
+    def __init__(self, lang1_file: str, lang2_file: str, lines: Optional[Tuple[int, int]] = None):
         self.lang1_file = lang1_file
         self.lang2_file = lang2_file
-
+        self.lines = lines        
+        
     def line_streamer(self, file_path: str) -> Iterator[str]:
+        current_line = 0
         with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                yield line.rstrip("\n")
+            for line in f:      
+                if self.lines is None or self.lines[0] <= current_line < self.lines[1]:       
+                    yield line.rstrip("\n")                
+                current_line += 1
+                if self.lines is not None and current_line >= self.lines[1]:
+                    break
 
     def __iter__(self) -> Iterator[Tuple[str, str]]:
         return zip(
@@ -88,12 +94,12 @@ class MixtureOfBitexts:
     @staticmethod
     def create_from_files(
         text_files: Dict[str, str],
-        lps: List[Tuple[str, str]],
+        lps: List[Tuple[str, str, Optional[Tuple[int, int]]]],
         batch_size: int,
         sampling_probs: Optional[List[float]] = None,
         only_once_thru: bool = False
     ) -> "MixtureOfBitexts":
-        bitexts = {(l1, l2): Bitext(text_files[l1], text_files[l2]) for (l1, l2) in lps}
+        bitexts = {(l1, l2): Bitext(text_files[l1], text_files[l2], lines) for (l1, l2, lines) in lps}        
         return MixtureOfBitexts(bitexts, batch_size, sampling_probs, only_once_thru)
 
     def get_language_codes(self) -> List[str]:
@@ -140,24 +146,3 @@ class TokenizedMixtureOfBitexts:
         lang2_tokenized = self._tokenize(lang2_sents, lang2_code, alt_pad_token=-100)
         return lang1_tokenized, lang2_tokenized, lang1_code, lang2_code
 
-
-if __name__ == "__main__":
-    config = {
-        "corpora": [
-            {
-                "code": "eng_Latn",
-                "filename": "test_files/lang1.txt",
-                "permutation": 0,
-            },
-            {
-                "code": "fra_Latn",
-                "filename": "test_files/lang2.txt",
-                "permutation": 1,
-            },
-            {
-                "code": "deu_Latn",
-                "filename": "test_files/lang3.txt",
-                "permutation": 1,
-            },
-        ]
-    }
