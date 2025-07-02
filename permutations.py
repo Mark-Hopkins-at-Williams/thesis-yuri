@@ -121,3 +121,79 @@ def batch_sort(batch_size=128):
                     file.write(line_list[reshuffled_batches[i][j]])
     
 
+
+
+    
+model_name = "facebook/nllb-200-distilled-600M"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+tokenized = tokenizer('tel') 
+
+token_num = tokenized['input_ids'][1]
+
+token = tokenizer.convert_ids_to_tokens([token_num])
+
+print(token)
+
+
+def is_subtoken(sentence: str, token: str, tokenizer):
+
+    token_ids = tokenizer(sentence)['input_ids']
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+
+    cleaned_tokens = [t.replace('▁', '') for t in tokens if not t.startswith('<')]
+
+    return any(token.lower() in t.lower() for t in cleaned_tokens)
+
+def is_related (token_num, filename1, filename2, tokenizer):
+
+    line_list1 = []
+    line_list2 = []
+    token = tokenizer.convert_ids_to_tokens([token_num])[0]
+    token_clean = tokenizer.convert_ids_to_tokens([token_num])[0].replace('▁','')
+    print(token)
+    with open(filename1, "r") as f1:
+        line_list1 = f1.readlines()
+    with open(filename2, "r") as f2:
+        line_list2 = f2.readlines()
+    in_first = 0
+    in_second = 0
+    in_both = 0
+    
+
+
+    for i in range(len(line_list1)):
+        tokenized1 = tokenizer(line_list1[i])
+        tokenized2 = tokenizer(line_list2[i])
+        if token_num in tokenized1['input_ids']:
+            in_first += 1
+            if token_num in tokenized2['input_ids'] or is_subtoken(line_list2[i], token_clean, tokenizer):
+                in_second += 1
+                in_both += 1
+
+        elif token_num in tokenized2['input_ids']:
+            in_second += 1
+            if is_subtoken(line_list1[i], token_clean, tokenizer):
+                in_first += 1
+                in_both += 1
+    
+    print(in_first); print(in_second); print(in_both)
+
+    print(in_both/in_first); print(in_both/in_second)
+
+    r1 = in_both/in_first
+    
+    r2 = in_both/in_second
+    
+    print((2*in_both)/(in_second+in_first))
+
+    if ((2*in_both)/(in_second+in_first)>0.5):
+        return True 
+    else:
+        return False
+
+
+
+
+result = is_related (token_num, '/mnt/storage/sotnichenko/encoder-decoder-finetuning/europarlData/train.en', '/mnt/storage/sotnichenko/encoder-decoder-finetuning/europarlData/train.es', tokenizer )
+print(result)
