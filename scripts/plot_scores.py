@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 BASE_DIR = Path("experiments/")
-PREFIX = "exp1"
+PREFIX = "exp1-2"
 METRIC = "bleu"
 
 def mean(ls):
@@ -18,7 +18,7 @@ def read_scores(experiment_dir):
         data = None
     return data
 
-x = [512, 1024, 2048, 4096, 8192, 16834]
+x = [1024, 2048, 4096, 8192, 16834]
 ys = dict()
 for tuning in ['multi', 'bi1', 'bi2']:
     ys[tuning] = []
