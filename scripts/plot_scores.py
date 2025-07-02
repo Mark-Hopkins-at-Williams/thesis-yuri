@@ -2,15 +2,14 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-BASE_DIR = Path("experiments/")
-PREFIX = "exp1-2"
+PREFIX = "exp2-1"
+BASE_DIR = Path("experiments/") / PREFIX
 METRIC = "bleu"
 
 def mean(ls):
     return sum(ls) / len(ls)
 
 def read_scores(experiment_dir):
-    print(experiment_dir)
     try:
         with open(Path(experiment_dir) / "scores.json") as reader:
             data = json.load(reader)
@@ -18,27 +17,38 @@ def read_scores(experiment_dir):
         data = None
     return data
 
-x = [1024, 2048, 4096, 8192, 16834]
-ys = dict()
-for tuning in ['multi', 'bi1', 'bi2']:
-    ys[tuning] = []
-    for num_train_lines in x:
-        exp_dirs = list(BASE_DIR.glob(f"{PREFIX}-{tuning}-{num_train_lines}-v*")) 
-        trial_scores = []
-        for exp_dir in exp_dirs:
-            scores = read_scores(exp_dir)
-            if scores is not None:
-                score_avg = mean([scores[lang_pair][METRIC] for lang_pair in scores])
-                trial_scores.append(score_avg)
-        ys[tuning].append(mean(trial_scores))
+exp_dirs = list(BASE_DIR.glob(f"{PREFIX}-*-*-v*")) 
+results = dict()
+xs = set()
+for exp_dir in exp_dirs:
+    exp_dir_name = str(exp_dir.name)
+    _, _, tuning, num_train_lines, trial = exp_dir_name.split('-')
+    num_train_lines = int(num_train_lines)
+    if tuning.startswith("bi"):
+        tuning = "bi"
+    if (tuning, num_train_lines) not in results:
+        results[(tuning, num_train_lines)] = []
+    xs.add(num_train_lines)
+    results[(tuning, num_train_lines)].append(exp_dir)
 
-y_bi = [(y1+y2)/2 for (y1, y2) in zip(ys['bi1'], ys['bi2'])]
+xs = sorted(xs)
+ys = {'multi': [], 'bi': []}
+for tuning, num_train_lines in sorted(results):
+    exp_dirs = results[(tuning, num_train_lines)]
+    trial_scores = []
+    for exp_dir in exp_dirs:
+        scores = read_scores(exp_dir)
+        if scores is not None:
+            score_avg = mean([scores[lang_pair][METRIC] for lang_pair in scores])
+            trial_scores.append(score_avg)
+    ys[tuning].append(mean(trial_scores))
 
-plt.plot(x, y_bi, label='bi', color='blue', linestyle='-')
-plt.plot(x, ys['multi'], label='multi', color='red', linestyle='--')
+print(xs)
+plt.plot(xs, ys['bi'], label='bi', color='blue', linestyle='-')
+plt.plot(xs, ys['multi'], label='multi', color='red', linestyle='--')
 plt.xscale('log')
 plt.xlabel('num train')
 plt.ylabel(METRIC)
 plt.title('Experiment')
 plt.legend()
-plt.savefig(f'{PREFIX}.{METRIC}.png')
+plt.savefig(BASE_DIR / f'{METRIC}.{PREFIX}.png')

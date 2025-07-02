@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-VARIANT = 3
+VARIANT = 1
 
 if VARIANT == 1:
     BASE_MODEL = "facebook/nllb-200-distilled-600M"
