@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-PREFIX = "exp2-1"
+PREFIX = "exp2-3"
 BASE_DIR = Path("experiments/") / PREFIX
 METRIC = "bleu"
 
@@ -42,7 +42,8 @@ for tuning, num_train_lines in sorted(results):
             score_avg = mean([scores[lang_pair][METRIC] for lang_pair in scores])
             trial_scores.append(score_avg)
     ys[tuning].append(mean(trial_scores))
-
+    
+        
 print(xs)
 plt.plot(xs, ys['bi'], label='bi', color='blue', linestyle='-')
 plt.plot(xs, ys['multi'], label='multi', color='red', linestyle='--')

@@ -14,6 +14,7 @@ from tqdm import tqdm
 from transformers import (
     Adafactor,
     AutoModelForSeq2SeqLM,
+    AutoConfig,
     get_constant_schedule_with_warmup,
 )
 
@@ -31,8 +32,14 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def prepare_model(base_model: str, freeze_encoder: bool):
-    model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
+def prepare_model(base_model: str, freeze_encoder: bool, should_finetune: bool):
+    if should_finetune:
+        model = AutoModelForSeq2SeqLM.from_pretrained(base_model) 
+        print('loaded pretrained model')
+    else: 
+        model_config = AutoConfig.from_pretrained(base_model)
+        model = AutoModelForSeq2SeqLM.from_config(model_config)
+        print('loaded architecture only')
     if hasattr(model.config, "max_length"):  # this should be in a GenerationConfig
         delattr(model.config, "max_length")
     if freeze_encoder:
@@ -81,9 +88,10 @@ def finetune(
     validate_every: int = 500,
     patience: int = 5,
     freeze_encoder: bool = False,
+    should_finetune: bool = True
 ):
     print(f"Training {model_dir}")
-    model = prepare_model(base_model, freeze_encoder)
+    model = prepare_model(base_model, freeze_encoder, should_finetune)
     optimizer = Adafactor(
         [p for p in model.parameters() if p.requires_grad],
         scale_parameter=False,
@@ -173,6 +181,7 @@ def main():
     params = config["finetuning_parameters"]
     train_bitexts = [(b["src"], b["tgt"], b["train_lines"]) for b in config["bitexts"]]
     devtest_bitexts = [(b["src"], b["tgt"], None) for b in config["bitexts"]]
+    should_finetune = params["finetune"] if "finetune" in params else True
     
     # Create unique model directory
     base_dir = config["model_dir"]
@@ -220,6 +229,7 @@ def main():
         model_dir,
         params['num_steps'],
         freeze_encoder=False,
+        should_finetune=should_finetune
     )
 
     test_data = MixtureOfBitexts.create_from_files(

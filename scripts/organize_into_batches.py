@@ -62,8 +62,8 @@ def reorganize(batch_size, root_dir, split, output_dir):
 
 if __name__ == "__main__":
     reorganize(
-        2,
-        Path("./test_files/reorganized"),
-        "train",
-        Path("./foo"),
+        128,
+        Path("/mnt/storage/hopkins/data/flores/test/"),
+        "test",
+        Path("./foo.test"),
     )
