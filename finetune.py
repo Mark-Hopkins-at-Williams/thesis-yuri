@@ -92,16 +92,28 @@ def finetune(
 ):
     print(f"Training {model_dir}")
     model = prepare_model(base_model, freeze_encoder, should_finetune)
-    optimizer = Adafactor(
-        [p for p in model.parameters() if p.requires_grad],
-        scale_parameter=False,
-        relative_step=False,
-        lr=1e-4,
-        clip_threshold=1.0,
-        weight_decay=1e-3,
-    )
-    scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=1000)
-
+    
+    if should_finetune:
+        optimizer = Adafactor(
+            [p for p in model.parameters() if p.requires_grad],
+            scale_parameter=False,
+            relative_step=False,
+            lr=1e-4,
+            clip_threshold=1.0,
+            weight_decay=1e-3,
+        )
+        scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=1000)
+    else:
+        optimizer = Adafactor(
+            model.parameters(),
+            scale_parameter=True,
+            relative_step=True,
+            lr=None,  # Required when using relative_step
+            clip_threshold=1.0,
+            weight_decay=0.01,  
+        )
+        scheduler = None
+        
     cleanup()
     train_losses, train_plot_x, train_plot_y = [], [], []
     dev_plot_x, dev_plot_y = [], []
