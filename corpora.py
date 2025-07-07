@@ -92,7 +92,6 @@ class TokenizedMixtureOfBitexts:
             tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = alt_pad_token
         if self.permutation_map is not None:
             if lang in self.permutation_map.keys():
-                print(f"Applying permutation for lang = {lang}")
                 pmap_lang = self.permutation_map[lang]
                 new_tokens = []
                 for tokenized_sent in tokens['input_ids']:

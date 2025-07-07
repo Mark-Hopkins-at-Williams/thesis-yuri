@@ -204,8 +204,8 @@ def main():
 
     raw_train_data = MixtureOfBitexts.create_from_files(
         {
-            "eng_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.en",
-            "pol_Latn": "/mnt/storage/hopkins/data/europarl/preprocessed/train.pl",
+            "eng_Latn": "/mnt/storage/sotnichenko/encoder-decoder-finetuning/optimized_data/optimized_train_128.en",
+            "pol_Latn": "/mnt/storage/sotnichenko/encoder-decoder-finetuning/optimized_data/optimized_train_128.pl",
         },
         [("eng_Latn", "pol_Latn")],
         batch_size=32,
@@ -244,8 +244,8 @@ def main():
     pmap_pl = CreateRandomPermutationWithFixedPoints(pol_vocab, fixed_pl)
     pmap = {"eng_Latn": pmap_en, "pol_Latn": pmap_pl}
     save_permutation_map(pmap, "pmap.json")
-    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap)
-    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128, permutation_map=pmap)
+    train_data = TokenizedMixtureOfBitexts(raw_train_data, tokenizer, max_length=128, permutation_map=pmap) # No pmap 
+    dev_data   = TokenizedMixtureOfBitexts(raw_dev_data, tokenizer, max_length=128, permutation_map=pmap) # No pmap
     finetune(
         model, tokenizer, train_data, dev_data, model_name, model_dir, args.steps, freeze_encoder=False
     )
