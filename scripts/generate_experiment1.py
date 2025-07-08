@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-VARIANT = 1
+VARIANT = 3
 
 if VARIANT == 1:
     BASE_MODEL = "facebook/nllb-200-distilled-600M"
@@ -10,6 +10,11 @@ if VARIANT == 1:
     TGTS = ["de"] * 2
 elif VARIANT == 2:
     BASE_MODEL = "facebook/nllb-200-distilled-600M"
+    SRC = "en"
+    SRC_ID = "eng_Latn"
+    TGTS = ["es"] * 2
+elif VARIANT == 3:
+    BASE_MODEL = "experiments/eng-jpn-pretrained-v0/"
     SRC = "en"
     SRC_ID = "eng_Latn"
     TGTS = ["es"] * 2
@@ -33,7 +38,7 @@ TGT_IDS = [
 
 def create_bituning_config(num_train_lines, tgt_index):
     return {
-        "model_dir": f"experiments/exp2-{VARIANT}-bi{tgt_index}-{num_train_lines}",
+        "model_dir": f"experiments/exp1-{VARIANT}/exp1-{VARIANT}-bi{tgt_index}-{num_train_lines}",
         "corpora": {
             SRC_ID: {
                 "train": f"data/train.{SRC}",
@@ -94,7 +99,7 @@ def create_multituning_config(num_train_lines):
         for tgt_index in range(len(TGTS))
     ]
     return {
-        "model_dir": f"experiments/exp1-{VARIANT}-multi-{num_train_lines}",
+        "model_dir": f"experiments/exp1-{VARIANT}/exp1-{VARIANT}-multi-{num_train_lines}",
         "corpora": corpora,
         "bitexts": bitexts,
         "finetuning_parameters": {
@@ -111,7 +116,7 @@ def create_shell_script(num_train_lines):
             "#SBATCH -c 1",
             "#SBATCH -t 3-12:00",
             "#SBATCH -p dl",
-            "#SBATCH --mem=10G",
+            #"#SBATCH --mem=10G",
             "#SBATCH -o logs/log_%j.out",
             "#SBATCH -e logs/log_%j.err",
             "#SBATCH --gres=gpu:1",
@@ -138,5 +143,5 @@ for num_train_lines in [1024, 2048, 4096, 8192, 16834]:
     ) as writer:
         json.dump(config, writer, indent=4)
     shell_script = create_shell_script(num_train_lines)
-    with open(config_dir / f"run.exp1-{VARIANT}.{num_train_lines}.json", "w") as writer:
+    with open(config_dir / f"run.exp1-{VARIANT}.{num_train_lines}.sh", "w") as writer:
         writer.write(shell_script)

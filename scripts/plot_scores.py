@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-PREFIX = "exp2-3"
+PREFIX = "exp1-2"
 BASE_DIR = Path("experiments/") / PREFIX
 METRIC = "bleu"
 
@@ -43,8 +43,7 @@ for tuning, num_train_lines in sorted(results):
             trial_scores.append(score_avg)
     ys[tuning].append(mean(trial_scores))
     
-        
-print(xs)
+
 plt.plot(xs, ys['bi'], label='bi', color='blue', linestyle='-')
 plt.plot(xs, ys['multi'], label='multi', color='red', linestyle='--')
 plt.xscale('log')
@@ -52,4 +51,5 @@ plt.xlabel('num train')
 plt.ylabel(METRIC)
 plt.title('Experiment')
 plt.legend()
+print("Plotting...")
 plt.savefig(BASE_DIR / f'{METRIC}.{PREFIX}.png')

@@ -130,7 +130,8 @@ def finetune(
             train_losses.append(loss.item())
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
-            scheduler.step()
+            if scheduler is not None:
+                scheduler.step()
         except RuntimeError as e:
             if "out of memory" in str(e):
                 print("GPU OOM. Cleaning up.")

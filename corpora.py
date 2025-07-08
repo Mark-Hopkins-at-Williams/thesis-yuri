@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
 from transformers import AutoTokenizer
@@ -12,7 +13,12 @@ def load_tokenizer(model_name: str):
             category=FutureWarning,
             module="transformers.tokenization_utils_base",
         )
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+        except OSError:
+            sys.stderr.write('Tokenizer not found. Using NLLB tokenizer instead.\n')
+            sys.stderr.flush()
+            tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
     return tokenizer
 
 
