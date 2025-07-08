@@ -2,18 +2,19 @@ import argparse
 import gc
 import json
 import matplotlib
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from pathlib import Path
+import shutil
 import sys
 import torch
 from tqdm import tqdm
 from transformers import (
     Adafactor,
     AutoModelForSeq2SeqLM,
+    AutoConfig,
     get_constant_schedule_with_warmup,
 )
 
@@ -23,6 +24,7 @@ from permutations import (
     create_random_permutation_with_fixed_points,
     save_permutation_map,
 )
+from validate import translate_tokenized_mixture_of_bitexts, evaluate_translations
 
 
 def cleanup():
@@ -30,10 +32,14 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-
-
-def prepare_model(base_model: str, freeze_encoder: bool):
-    model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
+def prepare_model(base_model: str, freeze_encoder: bool, should_finetune: bool):
+    if should_finetune:
+        model = AutoModelForSeq2SeqLM.from_pretrained(base_model) 
+        print('loaded pretrained model')
+    else: 
+        model_config = AutoConfig.from_pretrained(base_model)
+        model = AutoModelForSeq2SeqLM.from_config(model_config)
+        print('loaded architecture only')
     if hasattr(model.config, "max_length"):  # this should be in a GenerationConfig
         delattr(model.config, "max_length")
     if freeze_encoder:
@@ -82,19 +88,32 @@ def finetune(
     validate_every: int = 500,
     patience: int = 5,
     freeze_encoder: bool = False,
+    should_finetune: bool = True
 ):
     print(f"Training {model_dir}")
-    model = prepare_model(base_model, freeze_encoder)
-    optimizer = Adafactor(
-        [p for p in model.parameters() if p.requires_grad],
-        scale_parameter=False,
-        relative_step=False,
-        lr=1e-4,
-        clip_threshold=1.0,
-        weight_decay=1e-3,
-    )
-    scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=1000)
-
+    model = prepare_model(base_model, freeze_encoder, should_finetune)
+    
+    if should_finetune:
+        optimizer = Adafactor(
+            [p for p in model.parameters() if p.requires_grad],
+            scale_parameter=False,
+            relative_step=False,
+            lr=1e-4,
+            clip_threshold=1.0,
+            weight_decay=1e-3,
+        )
+        scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=1000)
+    else:
+        optimizer = Adafactor(
+            model.parameters(),
+            scale_parameter=True,
+            relative_step=True,
+            lr=None,  # Required when using relative_step
+            clip_threshold=1.0,
+            weight_decay=0.01,  
+        )
+        scheduler = None
+        
     cleanup()
     train_losses, train_plot_x, train_plot_y = [], [], []
     dev_plot_x, dev_plot_y = [], []
@@ -111,7 +130,8 @@ def finetune(
             train_losses.append(loss.item())
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
-            scheduler.step()
+            if scheduler is not None:
+                scheduler.step()
         except RuntimeError as e:
             if "out of memory" in str(e):
                 print("GPU OOM. Cleaning up.")
@@ -148,7 +168,7 @@ def finetune(
                 print("Saving new best model.")
                 best_dev_loss = dev_loss
                 steps_since_best = 0
-                model.save_pretrained(model_dir)
+                model.save_pretrained(model_dir)  # causes warning?
             else:
                 steps_since_best += 1
                 print(f"No improvement. Patience: {patience - steps_since_best}")
@@ -160,46 +180,54 @@ def finetune(
 def main():
     parser = argparse.ArgumentParser(description="Finetune NLLB model.")
     parser.add_argument(
-        "--model_dir", type=str, required=True, help="Directory to save finetuned model"
+        "--config", type=str, required=True, help="Directory to save finetuned model"
     )
-    parser.add_argument("--steps", type=int, default=60_000, help="Training steps")
     args = parser.parse_args()
 
+    with open(args.config) as reader:
+        config = json.load(reader)
+
+    all_corpora = config["corpora"]
+    train_corpora = {key: all_corpora[key]["train"] for key in all_corpora}
+    dev_corpora = {key: all_corpora[key]["dev"] for key in all_corpora}
+    test_corpora = {key: all_corpora[key]["test"] for key in all_corpora}
+    params = config["finetuning_parameters"]
+    train_bitexts = [(b["src"], b["tgt"], b["train_lines"]) for b in config["bitexts"]]
+    devtest_bitexts = [(b["src"], b["tgt"], None) for b in config["bitexts"]]
+    should_finetune = params["finetune"] if "finetune" in params else True
+    
     # Create unique model directory
-    base_dir = args.model_dir
+    base_dir = config["model_dir"]
     model_version = 0
     while os.path.exists(f"{base_dir}-v{model_version}"):
         model_version += 1
     model_dir = f"{base_dir}-v{model_version}"
     os.makedirs(model_dir)
+    shutil.copy(args.config, Path(model_dir) / Path(args.config).name)
+
     train_data = MixtureOfBitexts.create_from_files(
-        {
-            "pol_Latn": "data/train.pl",
-            "deu_Latn": "data/train.de",
-            "eng_Latn": "data/train.en",
-        },
-        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=64,
+        train_corpora, train_bitexts, batch_size=params["batch_size"]
     )
     dev_data = MixtureOfBitexts.create_from_files(
-        {
-            "pol_Latn": "data/dev.pl",
-            "deu_Latn": "data/dev.de",
-            "eng_Latn": "data/dev.en",
-        },
-        [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=64,
+        dev_corpora, devtest_bitexts, batch_size=params["batch_size"]
     )
-    model_name = "facebook/nllb-200-distilled-600M"
+    model_name = params["base_model"]
     tokenizer = load_tokenizer(model_name)
-    pmap = {
-        "pol_Latn": create_random_permutation_with_fixed_points(
-            len(tokenizer), tokenizer.all_special_ids
-        ),
-        "deu_Latn": create_random_permutation_with_fixed_points(
-            len(tokenizer), tokenizer.all_special_ids
-        )
-    }
+
+    # Create the permutations
+    permutations = dict()
+    pmap = dict()
+    for language in all_corpora:
+        permutation_index = all_corpora[language]["permutation"]
+        if permutation_index > 0:
+            if permutation_index not in permutations:
+                permutations[permutation_index] = (
+                    create_random_permutation_with_fixed_points(
+                        len(tokenizer), tokenizer.all_special_ids
+                    )
+                )
+            pmap[language] = permutations[permutation_index]
+        
     save_permutation_map(pmap, Path(model_dir) / "permutations.json")
     tokenized_train = TokenizedMixtureOfBitexts(
         train_data, tokenizer, max_length=128, permutation_map=pmap
@@ -212,41 +240,31 @@ def main():
         tokenized_dev,
         model_name,
         model_dir,
-        args.steps,
+        params['num_steps'],
         freeze_encoder=False,
+        should_finetune=should_finetune
     )
-
-    # test_mix = MixtureOfBitexts.create_from_files(
-    #     {
-    #         "pol_Latn": "data/test.pl",
-    #         "deu_Latn": "data/test.de",
-    #         "eng_Latn": "data/test.en",
-    #     },
-    #     [("eng_Latn", "pol_Latn"), ("eng_Latn", "deu_Latn")],
-    #     batch_size=32,
-    #     only_once_thru=True,
-    # )
-    # tokenized_test = TokenizedMixtureOfBitexts(test_mix, tokenizer, max_length=128)
-    # model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
-    # if USE_CUDA:
-    #     model.cuda()
-    #translations = translate_tokenized_mixture_of_bitexts(
-    #    tokenized_test, model, tokenizer, pmap
-    #)
-    #with open(Path(model_dir) / "translations.json", "w") as writer:
-    #    json.dump(translations, writer)
-    #print("Translations complete.")
 
     test_data = MixtureOfBitexts.create_from_files(
-        {
-            "fra_Latn": "data/test.fr",
-            "deu_Latn": "data/test.de",
-            "eng_Latn": "data/test.en",
-        },
-        [("eng_Latn", "fra_Latn"), ("eng_Latn", "deu_Latn")],
-        batch_size=32,
-        only_once_thru=True,
+        test_corpora, devtest_bitexts, batch_size=params["batch_size"],
+        only_once_thru=True
     )
+    tokenized_test = TokenizedMixtureOfBitexts(test_data, tokenizer, max_length=128)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
+    if USE_CUDA:
+        model.cuda()
+    translations = translate_tokenized_mixture_of_bitexts(
+        tokenized_test, model, tokenizer, pmap
+    )
+    with open(Path(model_dir) / "translations.json", "w") as writer:
+        json.dump(translations, writer)
+    print("Translations complete.")
+
+    test_data = MixtureOfBitexts.create_from_files(
+        test_corpora, devtest_bitexts, batch_size=params["batch_size"],
+        only_once_thru=True
+    )
+
     references = dict()
     batch = test_data.next_batch()
     while batch is not None:
@@ -260,16 +278,12 @@ def main():
         json.dump(references, writer)
     print("References complete.")
 
-
-    #scores = dict()
-    #for key in translations:
-    #    scores[key] = evaluate_translations(
-    #        translations[key], 
-    #        references[key]
-    #    )
-    #with open(Path(model_dir) / "scores.json", "w") as writer:
-    #    json.dump(scores, writer)
-    #print("Evaluation complete.")    
+    scores = dict()
+    for key in translations:
+        scores[key] = evaluate_translations(translations[key], references[key])
+    with open(Path(model_dir) / "scores.json", "w") as writer:
+        json.dump(scores, writer)
+    print("Evaluation complete.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
 from transformers import AutoTokenizer
@@ -12,19 +13,30 @@ def load_tokenizer(model_name: str):
             category=FutureWarning,
             module="transformers.tokenization_utils_base",
         )
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+        except OSError:
+            sys.stderr.write('Tokenizer not found. Using NLLB tokenizer instead.\n')
+            sys.stderr.flush()
+            tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
     return tokenizer
 
 
 class Bitext(IterableDataset):
-    def __init__(self, lang1_file: str, lang2_file: str):
+    def __init__(self, lang1_file: str, lang2_file: str, lines: Optional[Tuple[int, int]] = None):
         self.lang1_file = lang1_file
         self.lang2_file = lang2_file
-
+        self.lines = lines        
+        
     def line_streamer(self, file_path: str) -> Iterator[str]:
+        current_line = 0
         with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                yield line.rstrip("\n")
+            for line in f:      
+                if self.lines is None or self.lines[0] <= current_line < self.lines[1]:       
+                    yield line.rstrip("\n")                
+                current_line += 1
+                if self.lines is not None and current_line >= self.lines[1]:
+                    break
 
     def __iter__(self) -> Iterator[Tuple[str, str]]:
         return zip(
@@ -88,12 +100,12 @@ class MixtureOfBitexts:
     @staticmethod
     def create_from_files(
         text_files: Dict[str, str],
-        lps: List[Tuple[str, str]],
+        lps: List[Tuple[str, str, Optional[Tuple[int, int]]]],
         batch_size: int,
         sampling_probs: Optional[List[float]] = None,
         only_once_thru: bool = False
     ) -> "MixtureOfBitexts":
-        bitexts = {(l1, l2): Bitext(text_files[l1], text_files[l2]) for (l1, l2) in lps}
+        bitexts = {(l1, l2): Bitext(text_files[l1], text_files[l2], lines) for (l1, l2, lines) in lps}        
         return MixtureOfBitexts(bitexts, batch_size, sampling_probs, only_once_thru)
 
     def get_language_codes(self) -> List[str]:

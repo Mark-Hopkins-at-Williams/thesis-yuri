@@ -68,7 +68,7 @@ class TestUtil(unittest.TestCase):
             "lang3": "test_files/lang3.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("lang1", "lang2"), ("lang1", "lang3")], 3
+            text_files, [("lang1", "lang2", None), ("lang1", "lang3", None)], 3
         )
         batch = mix.next_batch()
         expected1 = (
@@ -100,8 +100,10 @@ class TestUtil(unittest.TestCase):
             "lang3": "test_files/lang3.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("lang1", "lang2"), ("lang1", "lang3")], 
-            batch_size=5, only_once_thru=True
+            text_files,
+            [("lang1", "lang2", None), ("lang1", "lang3", None)],
+            batch_size=5,
+            only_once_thru=True,
         )
         counter = 0
         batch = "not none"
@@ -118,8 +120,10 @@ class TestUtil(unittest.TestCase):
             "lang3": "test_files/lang3.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("lang1", "lang2"), ("lang1", "lang3")], 
-            batch_size=2, only_once_thru=True
+            text_files,
+            [("lang1", "lang2", None), ("lang1", "lang3", None)],
+            batch_size=2,
+            only_once_thru=True,
         )
         next_batch = "not none"
         while next_batch is not None:
@@ -127,16 +131,67 @@ class TestUtil(unittest.TestCase):
             if next_batch is not None:
                 batch = next_batch
         expected1 = (
-            ('The chef cooked a meal.', 'They built a house.'), 
-            ('Le chef a cuisiné un repas.', 'Ils ont construit une maison.'), 
-            'lang1', 
-            'lang2'
+            ("The chef cooked a meal.", "They built a house."),
+            ("Le chef a cuisiné un repas.", "Ils ont construit une maison."),
+            "lang1",
+            "lang2",
         )
         expected2 = (
-            ('The chef cooked a meal.', 'They built a house.'), 
-            ('Der Koch hat eine Mahlzeit gekocht.', 'Sie haben ein Haus gebaut.'), 
-            'lang1', 
-            'lang3'
+            ("The chef cooked a meal.", "They built a house."),
+            ("Der Koch hat eine Mahlzeit gekocht.", "Sie haben ein Haus gebaut."),
+            "lang1",
+            "lang3",
+        )
+        self.assertIn(batch, [expected1, expected2])
+
+    def test_mixture_of_bitexts_limited_lines1(self):
+        text_files = {
+            "lang1": "test_files/lang1.txt",
+            "lang2": "test_files/lang2.txt",
+            "lang3": "test_files/lang3.txt",
+        }
+        mix = MixtureOfBitexts.create_from_files(
+            text_files, [("lang1", "lang2", [4, 7]), ("lang1", "lang3", [14, 17])], 2
+        )
+        batch = mix.next_batch()
+        expected1 = (
+            ("He drinks coffee.", "We watched a movie."),
+            ("Il boit du café.", "Nous avons regardé un film."),
+            "lang1",
+            "lang2",
+        )
+        expected2 = (
+            ("The child drew a star.", "My brother broke the window."),
+            (
+                "Das Kind hat einen Stern gezeichnet.",
+                "Mein Bruder hat das Fenster zerbrochen.",
+            ),
+            "lang1",
+            "lang3",
+        )
+        self.assertIn(batch, [expected1, expected2])
+        
+    def test_mixture_of_bitexts_limited_lines2(self):
+        bitext1 = Bitext("test_files/lang1.txt", "test_files/lang2.txt", lines=[4, 7])
+        bitext2 = Bitext("test_files/lang1.txt", "test_files/lang3.txt", lines=[14, 17])
+        mix = MixtureOfBitexts(
+            {("lang1", "lang2"): bitext1, ("lang1", "lang3"): bitext2}, 2
+        )
+        batch = mix.next_batch()
+        expected1 = (
+            ("He drinks coffee.", "We watched a movie."),
+            ("Il boit du café.", "Nous avons regardé un film."),
+            "lang1",
+            "lang2",
+        )
+        expected2 = (
+            ("The child drew a star.", "My brother broke the window."),
+            (
+                "Das Kind hat einen Stern gezeichnet.",
+                "Mein Bruder hat das Fenster zerbrochen.",
+            ),
+            "lang1",
+            "lang3",
         )
         self.assertIn(batch, [expected1, expected2])
 
@@ -146,7 +201,7 @@ class TestUtil(unittest.TestCase):
             "fra_Latn": "test_files/lang2.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("eng_Latn", "fra_Latn")], 3
+            text_files, [("eng_Latn", "fra_Latn", None)], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
         tokenizer = load_tokenizer(base_model)
@@ -199,7 +254,7 @@ class TestUtil(unittest.TestCase):
             "fra_Latn": "test_files/lang2.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("eng_Latn", "fra_Latn")], 3
+            text_files, [("eng_Latn", "fra_Latn", None)], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
         tokenizer = load_tokenizer(base_model)
@@ -252,7 +307,7 @@ class TestUtil(unittest.TestCase):
             "fra_Latn": "test_files/lang2.txt",
         }
         mix = MixtureOfBitexts.create_from_files(
-            text_files, [("eng_Latn", "fra_Latn")], 3
+            text_files, [("eng_Latn", "fra_Latn", None)], 3
         )
         base_model = "facebook/nllb-200-distilled-600M"
         tokenizer = load_tokenizer(base_model)

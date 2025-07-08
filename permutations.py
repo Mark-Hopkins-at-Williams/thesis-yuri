@@ -8,7 +8,6 @@ def create_random_permutation_with_fixed_points(vocab_size, fixed_points):
     random.shuffle(p_range)
     return Permutation(p_domain, p_range)
 
-
 class Permutation:
     def __init__(self, domain, rng):
         self.domain = domain
@@ -59,6 +58,3 @@ if __name__ == "__main__":
         print(f"{i} => {q(i)}")
     for i in range(8):
         print(f"{i} => {q_inv(i)}")
-        
-
-
