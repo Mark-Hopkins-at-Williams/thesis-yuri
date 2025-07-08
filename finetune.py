@@ -79,8 +79,6 @@ def plot_losses(train_x, train_y, dev_x, dev_y, out_path: str):
 
 
 def finetune(
-    model,
-    tokenizer,
     train_data,
     dev_data,
     base_model: str,

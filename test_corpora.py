@@ -60,6 +60,7 @@ class TestUtil(unittest.TestCase):
         )
         self.assertIn(batch, [expected1, expected2])
 
+
     def test_mixture_of_bitexts2(self):
         text_files = {
             "lang1": "test_files/lang1.txt",
@@ -111,7 +112,7 @@ class TestUtil(unittest.TestCase):
             if batch is not None:
                 counter += 1
         self.assertEqual(counter, 8)
-
+        
     def test_mixture_of_bitexts4(self):
         text_files = {
             "lang1": "test_files/lang1.txt",
