@@ -241,7 +241,7 @@ def main():
         model_name,
         model_dir,
         params['num_steps'],
-        freeze_encoder=False,
+        freeze_encoder=params['freeze_encoder'] if 'freeze_encoder' in params else False,
         should_finetune=should_finetune
     )
 
