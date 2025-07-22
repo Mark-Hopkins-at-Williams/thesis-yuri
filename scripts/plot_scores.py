@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-PREFIX = "exp2-4"
+PREFIX = "exp3-2"
 BASE_DIR = Path("experiments/") / PREFIX
 METRIC = "bleu"
 
@@ -44,12 +44,24 @@ for tuning, num_train_lines in sorted(results):
     ys[tuning].append(mean(trial_scores))
     
 
-plt.plot(xs, ys['bi'], label='bi', color='blue', linestyle='-')
-plt.plot(xs, ys['multi'], label='multi', color='red', linestyle='--')
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Set seaborn style and context for a polished look
+sns.set(style='whitegrid', context='talk')  # 'talk' or 'paper' depending on your use
+
+plt.figure(figsize=(10, 6))
+
+# Plot lines with seaborn color palette
+sns.lineplot(x=xs, y=ys['bi'], label='bitune', color='C0', linestyle='-')
+sns.lineplot(x=xs, y=ys['multi'], label='multitune', color='C3', linestyle='--')
+
 plt.xscale('log')
-plt.xlabel('num train')
+plt.xlabel('size of training corpora')
 plt.ylabel(METRIC)
-plt.title('Experiment')
-plt.legend()
+#plt.title('Experiment Results')
+plt.legend(title='Training Type', loc='best')
+plt.tight_layout()
+
 print("Plotting...")
-plt.savefig(BASE_DIR / f'{METRIC}.{PREFIX}.png')
+plt.savefig(BASE_DIR / f'{METRIC}.{PREFIX}.png', dpi=300)
