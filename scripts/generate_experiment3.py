@@ -1,25 +1,30 @@
 import json
 from pathlib import Path
 
-VARIANT = 2
+VARIANT = 3
 
+# defaults
+BASE_MODEL = "facebook/nllb-200-distilled-600M"
+DATA_DIR = "data/"
+FREEZE_ENCODER = False
+FREEZE_DECODER = True
+TGT = "en"
+TGT_ID = "eng_Latn"
 
 if VARIANT == 1:
-    BASE_MODEL = "facebook/nllb-200-distilled-600M"
-    FREEZE_ENCODER = False
-    FREEZE_DECODER = True
     SRC = "es"
     SRCS = [f'{SRC}{i}' for i in range(2)]
-    TGT = "en"
-    TGT_ID = "eng_Latn"
 elif VARIANT == 2:
     BASE_MODEL = "experiments/jpn-eng-pretrained-v1/"
-    FREEZE_ENCODER = False
-    FREEZE_DECODER = True
     SRC = "es"
     SRCS = [f'{SRC}{i}' for i in range(2)]
-    TGT = "en"
-    TGT_ID = "eng_Latn"
+elif VARIANT == 3:
+    DATA_DIR = "/mnt/storage/hopkins/data/americasnlp2025/ST1_MachineTranslation/data/wayuu-spanish/prebatched"
+    TGT = "es"
+    TGT_ID = "spa_Latn"
+    SRC = "guc"
+    SRCS = [f'{SRC}{i}' for i in range(2)]
+   
 
 FT_PARAMS = {
     "base_model": BASE_MODEL,
@@ -53,16 +58,16 @@ def create_bituning_config(num_train_lines, src_index):
             "europarl": {
                 TGT: {
                     "lang_code": TGT_ID,
-                    "train": f"data/train.{TGT}",
-                    "dev": f"data/dev.{TGT}",
-                    "test": f"data/test.{TGT}",
+                    "train": f"{DATA_DIR}/train.{TGT}",
+                    "dev": f"{DATA_DIR}/dev.{TGT}",
+                    "test": f"{DATA_DIR}/test.{TGT}",
                     "permutation": 0,
                 },
                 SRCS[src_index]: {
                     "lang_code": SRC_IDS[src_index],
-                    "train": f"data/train.{SRC}",
-                    "dev": f"data/dev.{SRC}",
-                    "test": f"data/test.{SRC}",
+                    "train": f"{DATA_DIR}/train.{SRC}",
+                    "dev": f"{DATA_DIR}/dev.{SRC}",
+                    "test": f"{DATA_DIR}/test.{SRC}",
                     "permutation": 1,
                 },
             }
@@ -87,9 +92,9 @@ def create_multituning_config(num_train_lines):
         "europarl": {
             TGT: {
                 "lang_code": TGT_ID,
-                "train": f"data/train.{TGT}",
-                "dev": f"data/dev.{TGT}",
-                "test": f"data/test.{TGT}",
+                "train": f"{DATA_DIR}/train.{TGT}",
+                "dev": f"{DATA_DIR}/dev.{TGT}",
+                "test": f"{DATA_DIR}/test.{TGT}",
                 "permutation": 0,
             }
         }
@@ -97,9 +102,9 @@ def create_multituning_config(num_train_lines):
     for src_index, src in enumerate(SRCS):
         corpora["europarl"][SRCS[src_index]] = {
             "lang_code": SRC_IDS[src_index],
-            "train": f"data/train.{SRC}",
-            "dev": f"data/dev.{SRC}",
-            "test": f"data/test.{SRC}",
+            "train": f"{DATA_DIR}/train.{SRC}",
+            "dev": f"{DATA_DIR}/dev.{SRC}",
+            "test": f"{DATA_DIR}/test.{SRC}",
             "permutation": 1 + src_index,
         }
     bitexts = [
@@ -146,7 +151,7 @@ def create_shell_script(num_train_lines):
 
 config_dir = Path(f"configs/exp3-{VARIANT}")
 config_dir.mkdir(parents=True, exist_ok=True)
-for num_train_lines in [1024, 2048, 4096, 8192, 16834]:
+for num_train_lines in [1024, 2048, 4096, 8192, 16384]:
     for src_index in range(len(SRCS)):
         config = create_bituning_config(num_train_lines, src_index)
         with open(

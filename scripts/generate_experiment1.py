@@ -1,48 +1,48 @@
 import json
 from pathlib import Path
 
-VARIANT = 5
+VARIANT = 6
 
+# defaults
+BASE_MODEL = "facebook/nllb-200-distilled-600M"
+DATA_DIR = "data/"
+FREEZE_ENCODER = True
+FREEZE_DECODER = False
+SRC = "en"
+SRC_ID = "eng_Latn"
 
 if VARIANT == 1:
-    BASE_MODEL = "facebook/nllb-200-distilled-600M"
     FREEZE_ENCODER = False
-    SRC = "en"
-    SRC_ID = "eng_Latn"
     TGT = "de"
     TGTS = [f'{TGT}{i}' for i in range(2)]
 elif VARIANT == 2:
-    BASE_MODEL = "facebook/nllb-200-distilled-600M"
     FREEZE_ENCODER = False
-    SRC = "en"
-    SRC_ID = "eng_Latn"
     TGT = "es"
     TGTS = [f'{TGT}{i}' for i in range(2)]
 elif VARIANT == 3:
     BASE_MODEL = "experiments/eng-jpn-pretrained-v0/"
     FREEZE_ENCODER = False
-    SRC = "en"
-    SRC_ID = "eng_Latn"
     TGT = "es"
     TGTS = [f'{TGT}{i}' for i in range(2)]
 elif VARIANT == 4:
     BASE_MODEL = "experiments/eng-jpn-pretrained-v0/"
-    FREEZE_ENCODER = True
-    SRC = "en"
-    SRC_ID = "eng_Latn"
     TGT = "es"
     TGTS = [f'{TGT}{i}' for i in range(2)]
 elif VARIANT == 5:
-    BASE_MODEL = "facebook/nllb-200-distilled-600M"
-    FREEZE_ENCODER = True
-    SRC = "en"
-    SRC_ID = "eng_Latn"
     TGT = "es"
     TGTS = [f'{TGT}{i}' for i in range(2)]
+elif VARIANT == 6:
+    DATA_DIR = "/mnt/storage/hopkins/data/americasnlp2025/ST1_MachineTranslation/data/wayuu-spanish/prebatched"
+    SRC = "es"
+    SRC_ID = "spa_Latn"
+    TGT = "guc"
+    TGTS = [f'{TGT}{i}' for i in range(2)]
+
 
 FT_PARAMS = {
     "base_model": BASE_MODEL,
     "freeze_encoder": FREEZE_ENCODER,
+    "freeze_decoder": FREEZE_DECODER,
     "batch_size": 64,
     "num_steps": 60000,
 }
@@ -71,16 +71,16 @@ def create_bituning_config(num_train_lines, tgt_index):
             "europarl": {
                 SRC: {
                     "lang_code": SRC_ID,
-                    "train": f"data/train.{SRC}",
-                    "dev": f"data/dev.{SRC}",
-                    "test": f"data/test.{SRC}",
+                    "train": f"{DATA_DIR}/train.{SRC}",
+                    "dev": f"{DATA_DIR}/dev.{SRC}",
+                    "test": f"{DATA_DIR}/test.{SRC}",
                     "permutation": 0,
                 },
                 TGTS[tgt_index]: {
                     "lang_code": TGT_IDS[tgt_index],
-                    "train": f"data/train.{TGT}",
-                    "dev": f"data/dev.{TGT}",
-                    "test": f"data/test.{TGT}",
+                    "train": f"{DATA_DIR}/train.{TGT}",
+                    "dev": f"{DATA_DIR}/dev.{TGT}",
+                    "test": f"{DATA_DIR}/test.{TGT}",
                     "permutation": 1,
                 },
             }
@@ -105,9 +105,9 @@ def create_multituning_config(num_train_lines):
         "europarl": {
             SRC: {
                 "lang_code": SRC_ID,
-                "train": f"data/train.{SRC}",
-                "dev": f"data/dev.{SRC}",
-                "test": f"data/test.{SRC}",
+                "train": f"{DATA_DIR}/train.{SRC}",
+                "dev": f"{DATA_DIR}/dev.{SRC}",
+                "test": f"{DATA_DIR}/test.{SRC}",
                 "permutation": 0,
             }
         }
@@ -115,9 +115,9 @@ def create_multituning_config(num_train_lines):
     for tgt_index, tgt in enumerate(TGTS):
         corpora["europarl"][TGTS[tgt_index]] = {
             "lang_code": TGT_IDS[tgt_index],
-            "train": f"data/train.{TGT}",
-            "dev": f"data/dev.{TGT}",
-            "test": f"data/test.{TGT}",
+            "train": f"{DATA_DIR}/train.{TGT}",
+            "dev": f"{DATA_DIR}/dev.{TGT}",
+            "test": f"{DATA_DIR}/test.{TGT}",
             "permutation": 1 + tgt_index,
         }
     bitexts = [
@@ -164,7 +164,7 @@ def create_shell_script(num_train_lines):
 
 config_dir = Path(f"configs/exp1-{VARIANT}")
 config_dir.mkdir(parents=True, exist_ok=True)
-for num_train_lines in [1024, 2048, 4096, 8192, 16834]:
+for num_train_lines in [1024, 2048, 4096, 8192, 16384]:
     for tgt_index in range(len(TGTS)):
         config = create_bituning_config(num_train_lines, tgt_index)
         with open(

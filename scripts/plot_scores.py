@@ -2,9 +2,9 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-PREFIX = "exp3-2"
+PREFIX = "exp1-6"
 BASE_DIR = Path("experiments/") / PREFIX
-METRIC = "bleu"
+METRIC = "chrf"
 
 def mean(ls):
     return sum(ls) / len(ls)
