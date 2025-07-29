@@ -32,7 +32,7 @@ def cleanup():
     torch.cuda.empty_cache()
 
 
-def prepare_model(base_model: str, freeze_encoder: bool, should_finetune: bool):
+def prepare_model(base_model: str, freeze_decoder: bool, freeze_encoder: bool, should_finetune: bool):
     if should_finetune:
         model = AutoModelForSeq2SeqLM.from_pretrained(base_model) 
         print('loaded pretrained model')
@@ -42,6 +42,12 @@ def prepare_model(base_model: str, freeze_encoder: bool, should_finetune: bool):
         print('loaded architecture only')
     if hasattr(model.config, "max_length"):  # this should be in a GenerationConfig
         delattr(model.config, "max_length")
+    if freeze_decoder:
+        print("--> DECODER FROZEN <--")
+        for param in model.get_decoder().parameters():
+            param.requires_grad = False
+    else:
+        print("--> decoder NOT frozen <--")
     if freeze_encoder:
         print("--> ENCODER FROZEN <--")
         for param in model.get_encoder().parameters():
@@ -87,11 +93,12 @@ def finetune(
     report_every: int = 500,
     validate_every: int = 500,
     patience: int = 5,
+    freeze_decoder: bool = False,
     freeze_encoder: bool = False,
     should_finetune: bool = True
 ):
     print(f"Training {model_dir}")
-    model = prepare_model(base_model, freeze_encoder, should_finetune)
+    model = prepare_model(base_model, freeze_decoder, freeze_encoder, should_finetune)
     
     if should_finetune:
         optimizer = Adafactor(
@@ -203,7 +210,6 @@ def main():
     lang_codes = dict()        
     for corpus in config['corpora']:
         for key in config['corpora'][corpus]:
-            print(key)
             lang_codes[(corpus, key)] = config['corpora'][corpus][key]['lang_code']
     
 
@@ -240,7 +246,8 @@ def main():
         model_name,
         model_dir,
         params['num_steps'],
-        freeze_encoder=params['freeze_encoder'] if 'freeze_encoder' in params else False,
+        freeze_decoder=params['freeze_decoder'] if 'freeze_decoder' in params else False,
+        freeze_encoder=params['freeze_encoder'] if 'freeze_encoder' in params else False,        
         should_finetune=should_finetune
     )
 

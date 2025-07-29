@@ -5,4 +5,4 @@
 #SBATCH -o logs/log_%j.out
 #SBATCH -e logs/log_%j.err
 #SBATCH --gres=gpu:1
-python finetune.py --config configs/pretrain.eng-fra.json
+python finetune.py --config /mnt/storage/hopkins/research/encoder-decoder-finetuning/configs/pretrain.jpn-eng.json
