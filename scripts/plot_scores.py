@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-PREFIX = "exp1-6"
+PREFIX = "exp4-1"
 BASE_DIR = Path("experiments/") / PREFIX
 METRIC = "chrf"
 
@@ -56,7 +56,7 @@ plt.figure(figsize=(10, 6))
 sns.lineplot(x=xs, y=ys['bi'], label='bitune', color='C0', linestyle='-')
 sns.lineplot(x=xs, y=ys['multi'], label='multitune', color='C3', linestyle='--')
 
-plt.xscale('log')
+plt.xscale('log', base=2)
 plt.xlabel('size of training corpora')
 plt.ylabel(METRIC)
 #plt.title('Experiment Results')
