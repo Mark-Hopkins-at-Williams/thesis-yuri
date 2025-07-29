@@ -1,10 +1,15 @@
 import json
 import matplotlib.pyplot as plt
 from pathlib import Path
+import sys
 
-PREFIX = "exp4-1"
+if len(sys.argv) <= 1:
+    print("Usage: python plot_scores.py EXPERIMENT METRIC")
+    exit()
+    
+PREFIX = sys.argv[1]
 BASE_DIR = Path("experiments/") / PREFIX
-METRIC = "chrf"
+METRIC = "chrf" if len(sys.argv) <= 2 else sys.argv[2]
 
 def mean(ls):
     return sum(ls) / len(ls)
