@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-VARIANT = 4
+VARIANT = 7
 
 if VARIANT == 1:
     BASE_MODEL = "facebook/nllb-200-distilled-600M"
@@ -26,6 +26,24 @@ elif VARIANT == 4:
     SRC = "en"
     SRC_ID = "eng_Latn"
     TGTS = ["es", "pt"]
+    FREEZE_ENCODER = True
+elif VARIANT == 5:
+    BASE_MODEL = "facebook/nllb-200-distilled-600M"
+    SRC = "en"
+    SRC_ID = "eng_Latn"
+    TGTS = ["cs", "sk"]
+    FREEZE_ENCODER = True
+elif VARIANT == 6:
+    BASE_MODEL = "facebook/nllb-200-distilled-600M"
+    SRC = "en"
+    SRC_ID = "eng_Latn"
+    TGTS = ["de", "nl"]
+    FREEZE_ENCODER = True
+elif VARIANT == 7:
+    BASE_MODEL = "facebook/nllb-200-distilled-600M"
+    SRC = "en"
+    SRC_ID = "eng_Latn"
+    TGTS = ["es", "cs"]
     FREEZE_ENCODER = True
 
 TGT_IDS = [

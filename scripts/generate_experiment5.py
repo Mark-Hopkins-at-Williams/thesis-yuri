@@ -1,22 +1,20 @@
 import json
 from pathlib import Path
 
-VARIANT = 4
+EXP_NUM = 5
 BASE_MODEL = "facebook/nllb-200-distilled-600M"
 TGT = "en"
 TGT_ID = "eng_Latn"
 FREEZE_ENCODER = False
 FREEZE_DECODER = True
 
-if VARIANT == 1:
-    SRCS = ["es", "pt"]
-elif VARIANT == 2:
-    SRCS = ["cs", "sk"]
-elif VARIANT == 3:
-    SRCS = ["de", "nl"]
-elif VARIANT == 4:
-    SRCS = ["es", "cs"]
-    
+variants = []
+langs = ['cs', 'da', 'de', 'es', 'fi', 
+         'et', 'fr', 'it', 'nl', 'pl', 
+         'pt', 'ro', 'sk', 'sl', 'sv']
+for i in range(len(langs)):
+    for j in range(i+1, len(langs)):
+        variants.append([langs[i], langs[j]])
     
 
 
@@ -39,7 +37,7 @@ SRC_IDS = [
 
 def create_bituning_config(num_train_lines, src_index):
     return {
-        "model_dir": f"experiments/exp4-{VARIANT}/exp4-{VARIANT}-bi{src_index}-{num_train_lines}",
+        "model_dir": f"experiments/exp{EXP_NUM}-{VARIANT}/exp{EXP_NUM}-{VARIANT}-bi{src_index}-{num_train_lines}",
         "corpora": { 
             "europarl": {
                 SRCS[src_index]: {
@@ -112,7 +110,7 @@ def create_multituning_config(num_train_lines):
         for src_index in range(len(SRCS))
     ]
     return {
-        "model_dir": f"experiments/exp4-{VARIANT}/exp4-{VARIANT}-multi-{num_train_lines}",
+        "model_dir": f"experiments/exp{EXP_NUM}-{VARIANT}/exp{EXP_NUM}-{VARIANT}-multi-{num_train_lines}",
         "corpora": corpora,
         "bitexts": bitexts,
         "finetuning_parameters": {
@@ -125,8 +123,16 @@ def create_multituning_config(num_train_lines):
     }
 
 
-def create_shell_script(num_train_lines):
-    preface = [
+def create_shell_script_lines(num_train_lines):
+    lines = []
+    exp_config = config_dir / f"experiment{EXP_NUM}-{VARIANT}.multi.{num_train_lines}.json"
+    lines.append(f"python finetune.py --config {exp_config}")
+    for src_index in range(len(SRCS)):
+        exp_config = config_dir / f"experiment{EXP_NUM}-{VARIANT}.bi{src_index}.{num_train_lines}.json"
+        lines.append(f"python finetune.py --config {exp_config}",)
+    return lines
+
+preface = [
             "#!/bin/sh",
             "#SBATCH -c 1",
             "#SBATCH -t 3-12:00",
@@ -135,27 +141,24 @@ def create_shell_script(num_train_lines):
             "#SBATCH -e logs/log_%j.err",
             "#SBATCH --gres=gpu:1",
         ]
-    exp_config = config_dir / f"experiment4-{VARIANT}.multi.{num_train_lines}.json"
-    preface.append(f"python finetune.py --config {exp_config}")
-    for src_index in range(len(SRCS)):
-        exp_config = config_dir / f"experiment4-{VARIANT}.bi{src_index}.{num_train_lines}.json"
-        preface.append(f"python finetune.py --config {exp_config}",)
-    return "\n".join(preface)
 
-config_dir = Path(f"configs/exp4-{VARIANT}")
-config_dir.mkdir(parents=True, exist_ok=True)
-for num_train_lines in [1024, 2048, 4096, 8192, 16834]:
-    for src_index in range(len(SRCS)):
-        config = create_bituning_config(num_train_lines, src_index)
+shell_script_lines = []
+for num_train_lines in [4096]:
+    for VARIANT, SRCS in enumerate(variants):
+        config_dir = Path(f"configs/exp{EXP_NUM}-{VARIANT}")
+        config_dir.mkdir(parents=True, exist_ok=True)
+        for src_index in range(len(SRCS)):
+            config = create_bituning_config(num_train_lines, src_index)
+            with open(
+                config_dir / f"experiment{EXP_NUM}-{VARIANT}.bi{src_index}.{num_train_lines}.json", "w"
+            ) as writer:
+                json.dump(config, writer, indent=4)
+        config = create_multituning_config(num_train_lines)
         with open(
-            config_dir / f"experiment4-{VARIANT}.bi{src_index}.{num_train_lines}.json", "w"
+            config_dir / f"experiment{EXP_NUM}-{VARIANT}.multi.{num_train_lines}.json", "w"
         ) as writer:
             json.dump(config, writer, indent=4)
-    config = create_multituning_config(num_train_lines)
-    with open(
-        config_dir / f"experiment4-{VARIANT}.multi.{num_train_lines}.json", "w"
-    ) as writer:
-        json.dump(config, writer, indent=4)
-    shell_script = create_shell_script(num_train_lines)
-    with open(config_dir / f"run.exp4-{VARIANT}.{num_train_lines}.sh", "w") as writer:
-        writer.write(shell_script)
+        shell_script_lines.extend(create_shell_script_lines(num_train_lines))
+
+with open(Path(f"configs") / f"run.exp{EXP_NUM}-all.{num_train_lines}.sh", "w") as writer:
+    writer.write("\n".join(preface + shell_script_lines))

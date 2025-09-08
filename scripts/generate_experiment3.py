@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-VARIANT = 3
+VARIANT = 5
 
 # defaults
 BASE_MODEL = "facebook/nllb-200-distilled-600M"
@@ -23,6 +23,13 @@ elif VARIANT == 3:
     TGT = "es"
     TGT_ID = "spa_Latn"
     SRC = "guc"
+    SRCS = [f'{SRC}{i}' for i in range(2)]
+elif VARIANT == 4:
+    SRC = "cs"
+    SRCS = [f'{SRC}{i}' for i in range(2)]
+elif VARIANT == 5:
+    DATA_DIR = "/mnt/storage/hopkins/data/inuktitut"
+    SRC = "iu"
     SRCS = [f'{SRC}{i}' for i in range(2)]
    
 

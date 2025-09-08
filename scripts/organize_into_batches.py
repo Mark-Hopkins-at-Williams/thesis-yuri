@@ -44,7 +44,7 @@ def reorganize(batch_size, root_dir, split, output_dir):
             lengths.append((len(tokens), i))
     line_nums_by_length = [line_num for _, line_num in sorted(lengths)]
     chunk_starts = [
-        batch_size * k for k in range(len(line_nums_by_length) // batch_size)
+        batch_size * k for k in range((len(line_nums_by_length) // batch_size) - 1)
     ]
     shuffle(chunk_starts)
     line_nums = []
