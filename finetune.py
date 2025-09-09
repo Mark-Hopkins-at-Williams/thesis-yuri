@@ -17,7 +17,6 @@ from transformers import (
     AutoConfig,
     get_constant_schedule_with_warmup,
 )
-
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
 from permutations import (
@@ -155,7 +154,7 @@ def finetune(
             train_plot_y.append(avg_train_loss)
             sys.stdout.flush()
 
-        if i % validate_every == 0:
+        if i > 0 and i % validate_every == 0:
             print("Validating...")
             dev_loss = evaluate(model, dev_data)
             print(f"Dev loss: {dev_loss:.4f}")
