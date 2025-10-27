@@ -1,0 +1,164 @@
+ace_Arab -> eng_Latn perplexity score: 2.4942874908447266
+eng_Latn -> ace_Arab perplexity score: 4.7981953620910645
+language model -> ace_Arab perplexity score: 6.640847206115723
+
+bjn_Arab -> eng_Latn perplexity score: 1.8684310913085938
+eng_Latn -> bjn_Arab perplexity score: 3.8091208934783936
+language model -> bjn_Arab perplexity score: 6.068927764892578
+
+fur_Latn -> eng_Latn perplexity score: 0.9882341027259827
+eng_Latn -> fur_Latn perplexity score: 1.7648998498916626
+language model -> fur_Latn perplexity score: 5.481915473937988
+
+knc_Latn -> eng_Latn perplexity score: 1.702081561088562
+eng_Latn -> knc_Latn perplexity score: 3.4471588134765625
+language model -> knc_Latn perplexity score: 6.159796237945557
+
+mni_Beng -> eng_Latn perplexity score: 1.3992820978164673
+eng_Latn -> mni_Beng perplexity score: 1.7943702936172485
+language model -> mni_Beng perplexity score: 5.116585731506348
+
+scn_Latn -> eng_Latn perplexity score: 1.1538875102996826
+eng_Latn -> scn_Latn perplexity score: 2.7785074710845947
+language model -> scn_Latn perplexity score: 6.14857292175293
+
+zgh_Tfng -> eng_Latn perplexity score: 2.3652167320251465
+eng_Latn -> zgh_Tfng perplexity score: 3.9275922775268555
+language model -> zgh_Tfng perplexity score: 6.4708943367004395
+
+ace_Latn -> eng_Latn perplexity score: 1.384225845336914
+eng_Latn -> ace_Latn perplexity score: 2.957383632659912
+language model -> ace_Latn perplexity score: 6.481002330780029
+
+bjn_Latn -> eng_Latn perplexity score: 1.0326159000396729
+eng_Latn -> bjn_Latn perplexity score: 2.503520965576172
+language model -> bjn_Latn perplexity score: 6.409578323364258
+
+fuv_Latn -> eng_Latn perplexity score: 2.2109320163726807
+eng_Latn -> fuv_Latn perplexity score: 5.110506534576416
+language model -> fuv_Latn perplexity score: 7.270933151245117
+
+lij_Latn -> eng_Latn perplexity score: 0.981873095035553
+eng_Latn -> lij_Latn perplexity score: 1.8884285688400269
+language model -> lij_Latn perplexity score: 4.999058723449707
+
+mri_Latn -> eng_Latn perplexity score: 1.2228883504867554
+eng_Latn -> mri_Latn perplexity score: 1.6965632438659668
+language model -> mri_Latn perplexity score: 5.036818027496338
+
+shn_Mymr -> eng_Latn perplexity score: 1.5651366710662842
+eng_Latn -> shn_Mymr perplexity score: 2.6209516525268555
+language model -> shn_Mymr perplexity score: 5.272431373596191
+
+ary_Arab -> eng_Latn perplexity score: 1.163123607635498
+eng_Latn -> ary_Arab perplexity score: 2.260504722595215
+language model -> ary_Arab perplexity score: 5.925489902496338
+
+bug_Latn -> eng_Latn perplexity score: 1.7283846139907837
+eng_Latn -> bug_Latn perplexity score: 3.890317440032959
+language model -> bug_Latn perplexity score: 7.029958724975586
+
+gug_Latn -> eng_Latn perplexity score: 1.760491967201233
+eng_Latn -> gug_Latn perplexity score: 5.435819149017334
+language model -> gug_Latn perplexity score: 8.485666275024414
+
+lim_Latn -> eng_Latn perplexity score: 1.0698907375335693
+eng_Latn -> lim_Latn perplexity score: 2.5256683826446533
+language model -> lim_Latn perplexity score: 6.1996541023254395
+
+nqo_Nkoo -> eng_Latn perplexity score: 3.964778184890747
+eng_Latn -> nqo_Nkoo perplexity score: 0.8056623339653015
+language model -> nqo_Nkoo perplexity score: 2.176815986633301
+
+srd_Latn -> eng_Latn perplexity score: 1.521303415298462
+eng_Latn -> srd_Latn perplexity score: 2.6861114501953125
+language model -> srd_Latn perplexity score: 5.483374118804932
+
+arz_Arab -> eng_Latn perplexity score: 1.0015392303466797
+eng_Latn -> arz_Arab perplexity score: 1.4333534240722656
+language model -> arz_Arab perplexity score: 5.610718250274658
+
+crh_Latn -> eng_Latn perplexity score: 1.1235578060150146
+eng_Latn -> crh_Latn perplexity score: 2.211921215057373
+language model -> crh_Latn perplexity score: 6.246572017669678
+
+hne_Deva -> eng_Latn perplexity score: 0.8261466026306152
+eng_Latn -> hne_Deva perplexity score: 1.8437999486923218
+language model -> hne_Deva perplexity score: 5.863747596740723
+
+lmo_Latn -> eng_Latn perplexity score: 1.3199357986450195
+eng_Latn -> lmo_Latn perplexity score: 3.3796474933624268
+language model -> lmo_Latn perplexity score: 6.8101487159729
+
+nus_Latn -> eng_Latn perplexity score: 1.7409120798110962
+eng_Latn -> nus_Latn perplexity score: 2.359846591949463
+language model -> nus_Latn perplexity score: 4.497954845428467
+
+szl_Latn -> eng_Latn perplexity score: 1.1923617124557495
+eng_Latn -> szl_Latn perplexity score: 2.097684383392334
+language model -> szl_Latn perplexity score: 5.47273588180542
+
+bam_Latn -> eng_Latn perplexity score: 1.8595041036605835
+eng_Latn -> bam_Latn perplexity score: 3.64060115814209
+language model -> bam_Latn perplexity score: 6.531978130340576
+
+dik_Latn -> eng_Latn perplexity score: 2.075568675994873
+eng_Latn -> dik_Latn perplexity score: 4.738855838775635
+language model -> dik_Latn perplexity score: 6.888839244842529
+
+kas_Arab -> eng_Latn perplexity score: 1.1205781698226929
+eng_Latn -> kas_Arab perplexity score: 2.1873252391815186
+language model -> kas_Arab perplexity score: 5.19271993637085
+
+ltg_Latn -> eng_Latn perplexity score: 1.2199862003326416
+eng_Latn -> ltg_Latn perplexity score: 2.023143768310547
+language model -> ltg_Latn perplexity score: 5.349543571472168
+
+pbt_Arab -> eng_Latn perplexity score: 1.089547872543335
+eng_Latn -> pbt_Arab perplexity score: 1.9602926969528198
+language model -> pbt_Arab perplexity score: 5.36009407043457
+
+taq_Latn -> eng_Latn perplexity score: 1.8960932493209839
+eng_Latn -> taq_Latn perplexity score: 4.226062774658203
+language model -> taq_Latn perplexity score: 6.763915538787842
+
+ban_Latn -> eng_Latn perplexity score: 0.8845384120941162
+eng_Latn -> ban_Latn perplexity score: 2.204035997390747
+language model -> ban_Latn perplexity score: 6.802670478820801
+
+dzo_Tibt -> eng_Latn perplexity score: 2.2671024799346924
+eng_Latn -> dzo_Tibt perplexity score: 3.455329418182373
+language model -> dzo_Tibt perplexity score: 5.702117919921875
+
+kas_Deva -> eng_Latn perplexity score: 1.2147705554962158
+eng_Latn -> kas_Deva perplexity score: 2.7048499584198
+language model -> kas_Deva perplexity score: 6.121866226196289
+
+mag_Deva -> eng_Latn perplexity score: 0.7594367265701294
+eng_Latn -> mag_Deva perplexity score: 1.759998083114624
+language model -> mag_Deva perplexity score: 5.69018030166626
+
+prs_Arab -> eng_Latn perplexity score: 1.1296931505203247
+eng_Latn -> prs_Arab perplexity score: 2.2055366039276123
+language model -> prs_Arab perplexity score: 6.381402969360352
+
+taq_Tfng -> eng_Latn perplexity score: 2.3603827953338623
+eng_Latn -> taq_Tfng perplexity score: 2.9025537967681885
+language model -> taq_Tfng perplexity score: 5.0052595138549805
+
+bho_Deva -> eng_Latn perplexity score: 0.9837459921836853
+eng_Latn -> bho_Deva perplexity score: 1.8374443054199219
+language model -> bho_Deva perplexity score: 5.914003849029541
+
+eng_Latn -> eng_Latn perplexity score: 0.40224602818489075
+eng_Latn -> eng_Latn perplexity score: 0.40224602818489075
+language model -> eng_Latn perplexity score: 5.129953384399414
+
+knc_Arab -> eng_Latn perplexity score: 3.2558305263519287
+eng_Latn -> knc_Arab perplexity score: 3.2884860038757324
+language model -> knc_Arab perplexity score: 4.029600143432617
+
+vec_Latn -> eng_Latn perplexity score: 1.0107262134552002
+eng_Latn -> vec_Latn perplexity score: 2.4720256328582764
+language model -> vec_Latn perplexity score: 6.204997539520264
+
