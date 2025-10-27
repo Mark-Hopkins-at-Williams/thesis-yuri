@@ -22,7 +22,7 @@ def compute_conditional_perplexity(src_lang, tgt_lang, base_model):
     )
     model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
     
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     next_batch = tmob.next_batch()
     total_loss = 0.0
