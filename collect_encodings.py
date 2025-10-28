@@ -72,9 +72,10 @@ def evaluate(model, dev_data, batches: int = 100):
             y = y.to(model.device)
             x_encoding = encoder(**x)
             y_encoding = encoder(**y)
-            xq = x_encoding.last_hidden_state[0].cpu().numpy()
-            xb = y_encoding.last_hidden_state[0].cpu().numpy()
-            
+            xq = x_encoding.last_hidden_state[0]#.cpu().numpy()
+            xb = y_encoding.last_hidden_state[0]#.cpu().numpy()
+            print(xq.shape)
+            print(xb.shape)
             index = faiss.IndexFlatL2(1024)
             index.add(xb)
             k = 1
