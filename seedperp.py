@@ -1,19 +1,12 @@
 from corpora import load_tokenizer, Bitext, MixtureOfBitexts, TokenizedMixtureOfBitexts
 import torch
 from transformers import AutoModelForSeq2SeqLM
+from unigram import compute_unigram_perplexity
 
-
-def compute_conditional_perplexity(src_lang, tgt_lang, base_model):
-    if src_lang is None:
-        src_path = "test_files/blank.txt"
-        src_lang = "eng_Latn"
-    else:
-        src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{src_lang}"
-    
-    tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{tgt_lang}"
+def compute_conditional_perplexity(src_lang, src_path, tgt_lang, tgt_path, base_model, batch_size=32):
     bitext = Bitext(src_path, tgt_path)
     mix = MixtureOfBitexts(
-        {(("test", src_lang), ("test", tgt_lang)): bitext}, batch_size=32, only_once_thru=True
+        {(("test", src_lang), ("test", tgt_lang)): bitext}, batch_size=batch_size, only_once_thru=True
     )
     lang_codes = {("test", src_lang): src_lang, ("test", tgt_lang): tgt_lang}
     tokenizer = load_tokenizer(base_model)
@@ -27,17 +20,13 @@ def compute_conditional_perplexity(src_lang, tgt_lang, base_model):
     next_batch = tmob.next_batch()
     total_loss = 0.0
     while next_batch is not None:
-        x, y, _, _ = next_batch        
+        x, y, _, _ = next_batch    
         x = x.to(model.device)
         y = y.to(model.device)
         loss = model(**x, labels=y.input_ids).loss
         total_loss += loss.item() * y.attention_mask.sum()
         next_batch = tmob.next_batch()
-    return total_loss
-
-def compute_lm_perplexity(tgt_lang, base_model):
-    compute_conditional_perplexity(None, tgt_lang, base_model)
-    
+    return total_loss.item()
 
 
 
@@ -91,10 +80,32 @@ if __name__ == "__main__":
 
     base_model = "facebook/nllb-200-distilled-600M"
     
+    src_path = 'test_files/lang1.txt'  # english
+    tgt_path = 'test_files/lang2.txt'  # french
+    p_cond = compute_conditional_perplexity('eng_Latn', src_path, "fra_Latn", tgt_path, base_model, batch_size=6)
+    p_unigram = compute_unigram_perplexity(tgt_path, base_model)
+    
+    src_path = "test_files/blank.txt"
+    p_lm = compute_conditional_perplexity("eng_Latn", src_path, "fra_Latn", tgt_path, base_model)
+        
+    
+    print(p_cond)
+    print(p_unigram)
+    print(p_lm)
+    exit()
+        
     for lang in langs:
-        print(f'eng_Latn -> {lang}: {compute_conditional_perplexity(lang, "eng_Latn", base_model)}')
-        print(f'{lang} -> eng_Latn: {compute_conditional_perplexity("eng_Latn", lang, base_model)}')
-        print(f'{lang}: {compute_lm_perplexity(lang,  base_model)}')
+        src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
+        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/eng_Latn"
+        print(f'eng_Latn -> {lang}: {compute_conditional_perplexity(lang, src_path, "eng_Latn", tgt_path, base_model)}')
+        
+        src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/eng_Latn"
+        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"        
+        print(f'{lang} -> eng_Latn: {compute_conditional_perplexity("eng_Latn", src_path, lang, tgt_path, base_model)}')
+        
+        src_path = "test_files/blank.txt"
+        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"                
+        print(f'{lang}: {compute_conditional_perplexity("eng_Latn", src_path, lang, tgt_path, base_model)}')
         
         
 

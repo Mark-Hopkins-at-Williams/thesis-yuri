@@ -5,43 +5,28 @@ from collections import Counter
 import math
 
 
-def unigram_distribution(src_lang, base_model):
-    src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{src_lang}"
+def compute_unigram_distribution(src_path, base_model):
     tokenizer = load_tokenizer(base_model)
-    model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     token_freqs = Counter()
     total_tokens = 0 
     with open(src_path, 'r') as file:
         for line in file:
-            # i actually don't know what .to(model.device) does lol ...
-            inputs = tokenizer(line.strip(), return_tensors="pt").to(model.device)
-            #print(inputs.token_to_chars(5))
-            token_vals = inputs.input_ids.flatten().tolist()
-            token_freqs.update(token_vals[1:len(token_vals)-1])
-            total_tokens += inputs.attention_mask.sum().item() - 2
-    # token_probs = Counter()
-    for token in token_freqs:
-        prob = token_freqs[token] / total_tokens
-        token_freqs[token] = prob
-
-    return token_freqs
+            inputs = tokenizer(line.strip(), return_tensors="pt")
+            token_vals = inputs.input_ids.flatten().tolist()            
+            token_freqs.update(token_vals[1:len(token_vals)])            
+            total_tokens += inputs.attention_mask.sum().item() - 1
+    return {token: token_freqs[token] / total_tokens for token in token_freqs}
+    
 
 
-def calculate_unigram_perplexity(src_lang, unigram_distribution, base_model):
-    src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{src_lang}"
-    tokenizer = load_tokenizer(base_model)
-    model = AutoModelForSeq2SeqLM.from_pretrained(base_model)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def compute_unigram_perplexity(src_path, base_model, tokenizer):
+    unigram_distribution = compute_unigram_distribution(src_path, base_model)
     perp = 0.0
-
     with open(src_path, 'r') as file:
         for line in file:
-            # i actually don't know what .to(model.device) does lol ...
-            inputs = tokenizer(line.strip(), return_tensors="pt").to(model.device)
+            inputs = tokenizer(line.strip())#, return_tensors="pt")
             token_vals = inputs.input_ids.flatten().tolist()
-            for token in token_vals[1:len(token_vals)-1]:
+            for token in token_vals[1:len(token_vals)]:
                 token_prob = unigram_distribution[token]
                 perp += -math.log(token_prob)
     return perp
@@ -93,11 +78,15 @@ if __name__ == "__main__":
     ]
 
     base_model = "facebook/nllb-200-distilled-600M"
+    hf_tokenizer = load_tokenizer(base_model)
+    def tokenizer(s):
+        return hf_tokenizer(s, return_tensor="pt")
 
     with open("unigram_loss.txt", "a") as file:
         for lang in langs:
-            unigram_probs = unigram_distribution(lang, base_model)
-            perplexity = calculate_unigram_perplexity(lang, unigram_probs, base_model)
+            src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
+            perplexity = compute_unigram_perplexity(src_path, base_model, tokenizer)
+            print(f'{lang} unigram perplexity: {perplexity}\n')
             file.write(f'{lang} unigram perplexity: {perplexity}\n')
             
     print("done writing data idiot")

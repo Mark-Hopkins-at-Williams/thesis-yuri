@@ -56,7 +56,8 @@ class MixtureOfBitexts:
         self.keys = list(bitexts)
         self.batch_size = batch_size
         self.batch_iters = {}
-
+        self.only_once_thru = only_once_thru
+        
         for key in self.keys:
             self.batch_iters[key] = self._create_iterator(key)
 
@@ -65,7 +66,7 @@ class MixtureOfBitexts:
             p / total for p in (sampling_probs or [1.0] * len(bitexts))
         ]
         
-        self.only_once_thru = only_once_thru
+        
         self.completed_bitexts = set()
 
     def _create_iterator(
@@ -76,7 +77,7 @@ class MixtureOfBitexts:
                 self.bitexts[key],
                 batch_size=self.batch_size,
                 shuffle=False,
-                drop_last=True,
+                drop_last=(not self.only_once_thru),
             )
         )
 
@@ -92,7 +93,7 @@ class MixtureOfBitexts:
                     self.completed_bitexts.add(lang_pair)
                 else: # start a new iterator for the chosen bitext
                     self.batch_iters[lang_pair] = self._create_iterator(lang_pair)                    
-        if still_choosing:
+        if still_choosing and self.only_once_thru:
             return None
         else:
             return lang1_sents, lang2_sents, lang_pair[0], lang_pair[1]
@@ -169,3 +170,20 @@ class TokenizedMixtureOfBitexts:
         lang1_tokenized = self._tokenize(lang1_sents, lang1)
         lang2_tokenized = self._tokenize(lang2_sents, lang2, alt_pad_token=-100)
         return lang1_tokenized, lang2_tokenized, lang1, lang2
+
+if __name__ == "__main__":
+    text_files = {
+        "lang1": "test_files/lang1.txt",
+        "lang2": "test_files/lang2.txt"
+    }
+    mix = MixtureOfBitexts.create_from_files(
+        text_files,
+        [("lang1", "lang2", None)],
+        batch_size=6,
+        only_once_thru=True,
+    )
+    counter = 0
+    batch = "not none"
+    while batch is not None:
+        batch = mix.next_batch()
+        print(batch)
