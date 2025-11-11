@@ -1,17 +1,23 @@
+import os
+import shutil
+import sys
+from pathlib import Path
+from tqdm import tqdm
+from permutations import (create_random_permutation_with_fixed_points, save_permutation_map,)
+from validate import translate_tokenized_mixture_of_bitexts, evaluate_translations
+import matplotlib.pyplot as plt
+import numpy as np
+
 import argparse
 import gc
 import json
 import faiss
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-from pathlib import Path
-import shutil
-import sys
+
+
 import torch
-from tqdm import tqdm
+
 from transformers import (
     Adafactor,
     AutoModelForSeq2SeqLM,
@@ -20,11 +26,7 @@ from transformers import (
 )
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
-from permutations import (
-    create_random_permutation_with_fixed_points,
-    save_permutation_map,
-)
-from validate import translate_tokenized_mixture_of_bitexts, evaluate_translations
+
 
 
 def cleanup():
@@ -64,7 +66,6 @@ def evaluate(model, dev_data, batches: int = 100):
     
     model.eval()
     encoder = model.model.encoder
-    print('hi')
     with torch.no_grad():
         for _ in range(batches):
             x, y, _, _ = dev_data.next_batch()
