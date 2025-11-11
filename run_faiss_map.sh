@@ -5,4 +5,4 @@
 #SBATCH -o faiss_sample/logs/log_%j.out
 #SBATCH -e faiss_sample/logs/log_%j.err
 #SBATCH --gres=gpu:1
-python faiss_map.py --config faiss_sample/config.json
+python faiss_map.py --config config.json
