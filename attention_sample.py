@@ -17,14 +17,17 @@ from tokenization import NllbTokenizer, HuggingfaceTokenizer
 from attention import SimpleAttention
 
 USE_CUDA = torch.cuda.is_available()
+import torch.nn.functional as F
 
-
+def logger(s):
+    sys.stderr.write(f'{s}\n')
+    sys.stderr.flush()
 
 
 def compute_language_embeddings(model, tokenized_data, lang_codes):
     """
-    Collect fine-grained token-level embeddings for the first sentence in each batch.
-    Returns a dict: lang_code -> numpy array of shape (total_tokens, hidden_dim)
+    Collect fine-grained token-level embeddings for the source language of each batch.
+    Returns a dict: lang_code -> list of [seq_len, hidden_dim] numpy arrays
     """
     model.eval()
     encoder = model.model.encoder
@@ -32,65 +35,63 @@ def compute_language_embeddings(model, tokenized_data, lang_codes):
 
     with torch.no_grad():
         batch = tokenized_data.next_batch()
-        
-        x, y, src_lang, tgt_lang = batch
-     
-        # print(x)
-        # print(y)
-        # print(src_lang)
-        # print(tgt_lang)
-        # Source embeddings: first (and only) sentence in batch, all tokens
-        x = x.to(model.device)
-        x_enc = encoder(**x).last_hidden_state[0] # [seq_len, hidden_dim]
-        y = y.to(model.device)
-        y_enc = encoder(**y).last_hidden_state[0]  # [seq_len, hidden_dim]
-        
-        #print(x_enc.shape)
-        #print(y_enc.shape)
-        attn = SimpleAttention()
-        out, weights = attn(x_enc, y_enc)
-        print(out.shape)
-        
-        #embeddings[lang_codes[src_lang]].append(x_enc)           
-            
-    exit()
+        while batch is not None:
+            x, _, src_lang, _ = batch  # ignore target
+
+            # Move to device
+            x = x.to(model.device)
+
+            # Get encoder outputs
+            x_enc = encoder(**x).last_hidden_state[0]  # [seq_len, hidden_dim]
+
+            # Store embeddings for source language only
+            embeddings[lang_codes[src_lang]].append(x_enc.cpu().numpy())
+
+            batch = tokenized_data.next_batch()
+
+    return dict(embeddings)
 
 
-def compute_faiss_heatmap(embeddings):
+
+def compute_attention_heatmap(embeddings):
     """
-    embeddings: dict lang_code -> (num_tokens, hidden_dim)
-    lang_list: ordered list of languages
-    Returns a matrix of average nearest-neighbor distances (not symmetric).
+    embeddings: dict lang_code -> list of [seq_len, hidden_dim] arrays
+    Returns a matrix of average cosine similarity (attention-based) between languages.
     """
-    
-    lang_list = embeddings.keys()
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    lang_list = list(embeddings.keys())
+
     n = len(lang_list)
-    distances = defaultdict(list)
     heatmap = np.zeros((n, n))
 
-    for i, lang_i in tqdm(enumerate(lang_list)):        
-        for sent_index in range(len(embeddings[lang_i])):
-            xb = embeddings[lang_i][sent_index]        
-            index = faiss.IndexFlatL2(xb.shape[1])
-            index.add(xb)
-            for j, lang_j in enumerate(lang_list):
-                xq = embeddings[lang_j][sent_index].astype('float32')
-                D, I = index.search(xq, 1)  # nearest neighbor distances
-                avg_distance = D.mean()
-                distances[(i, j)].append(avg_distance)
-    for (i, j) in distances:
-        heatmap[i, j] = sum(distances[(i,j)]) / len(distances[(i,j)])        
+    attn = SimpleAttention()
+
+    for i, lang_i in tqdm(enumerate(lang_list)):
+        for j, lang_j in enumerate(lang_list):
+            scores = []
+            # Compare sentence by sentence (assume same number of sentences)
+            for k in range(min(len(embeddings[lang_i]), len(embeddings[lang_j]))):
+                E = torch.tensor(embeddings[lang_i][k])  # [seq_len, hidden_dim]
+                G = torch.tensor(embeddings[lang_j][k])
+                out, weights = attn(E, G)  # [seq_len, hidden_dim]
+
+                # Compute cosine similarity per token between E and attended context
+                token_scores = F.cosine_similarity(E, out, dim=-1)  # [seq_len]
+                scores.append(token_scores.mean().item())
+
+            heatmap[i, j] = np.mean(scores)
 
     return heatmap, lang_list
 
 
-
-def plot_clustermap(matrix, labels, out_file="language_clustermap.png"):
-    # Convert the matrix to a DataFrame for labeled axes
+def plot_clustermap(matrix, labels, out_file="attention_heatmap.png"):
+    """
+    Same as before, just updated title
+    """
     import pandas as pd
     df = pd.DataFrame(matrix, index=labels, columns=labels)
 
-    # Create the clustermap
     g = sns.clustermap(
         df,
         cmap="viridis",
@@ -99,24 +100,19 @@ def plot_clustermap(matrix, labels, out_file="language_clustermap.png"):
         linewidths=0.5,
     )
 
-    # Customize titles and layout
-    plt.suptitle("FAISS Avg Nearest-Neighbor L2 Distances (Fine-Grained)", y=1.02)
+    plt.suptitle("Attention Avg Cosine Similarity (Fine-Grained)", y=1.02)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right')
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
 
-    # Save and show
     plt.tight_layout()
     plt.savefig(out_file, bbox_inches="tight")
     print(f"Saved clustermap to {out_file}")
 
-def logger(s):
-    sys.stderr.write(f'{s}\n')
-    sys.stderr.flush()
 
 
 def main():
     # Load config JSON
-    with open("atten_config.json") as f:
+    with open("config.json") as f:
         config = json.load(f)
 
     # Extract language codes
@@ -125,6 +121,7 @@ def main():
         for c in config['corpora'] for k in config['corpora'][c]
     }
     LANGS = list(lang_codes.values())
+
 
     # Load model
     logger('loading model...')
@@ -149,15 +146,16 @@ def main():
     
     tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer,
                                               lang_codes=lang_codes, permutation_map={})
-
+    
     # Compute fine-grained embeddings
     logger('computing embeddings...')
     embeddings = compute_language_embeddings(model, tokenized_dev, lang_codes)
-    print(embeddings)
+    #print(embeddings)
+
 
     # Compute FAISS heatmap
     logger('computing heatmap...')
-    heatmap, lang_list = compute_faiss_heatmap(embeddings)
+    heatmap, lang_list = compute_attention_heatmap(embeddings)
 
     # Plot heatmap
     plot_clustermap(heatmap, lang_list, out_file="attention_heatmap.png")
