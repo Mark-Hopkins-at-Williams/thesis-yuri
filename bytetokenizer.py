@@ -1,17 +1,8 @@
-# bare minimum functionality ....
-
-class Tokens:
-    def __init__(self, input_ids):
-        self.input_ids = input_ids 
-    
-    def __len__(self): 
-        return len(self.input_ids)
-
 class ByteTokenizer:
-    def __init__(self, encoding):
+    def __init__(self, encoding='utf-8'):
         self.encoding = encoding
 
     def __call__(self, sentence):
         byted = sentence.encode(self.encoding)
-        inputs = Tokens(list(byted))
+        inputs = {'input_ids': list(byted)}
         return inputs
