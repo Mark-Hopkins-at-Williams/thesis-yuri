@@ -2,6 +2,7 @@ from corpora import load_tokenizer, Bitext, MixtureOfBitexts, TokenizedMixtureOf
 import torch
 from transformers import AutoModelForSeq2SeqLM
 from unigram import compute_unigram_perplexity
+from bytetokenizer import ByteTokenizer, Tokens 
 
 def compute_conditional_perplexity(src_lang, src_path, tgt_lang, tgt_path, base_model, batch_size=32):
     bitext = Bitext(src_path, tgt_path)
@@ -24,12 +25,9 @@ def compute_conditional_perplexity(src_lang, src_path, tgt_lang, tgt_path, base_
         x = x.to(model.device)
         y = y.to(model.device)
         loss = model(**x, labels=y.input_ids).loss
-        total_loss += loss.item() * y.attention_mask.sum()
+        total_loss += loss.item() * y.input_ids.numel() # erm...
         next_batch = tmob.next_batch()
-    return total_loss.item()
-
-
-
+    return total_loss
 
 
 if __name__ == "__main__":
@@ -77,37 +75,39 @@ if __name__ == "__main__":
         "vec_Latn",
     ]
 
-
     base_model = "facebook/nllb-200-distilled-600M"
+    hf_tokenizer = load_tokenizer(base_model)
+    byte_tokenizer = ByteTokenizer("utf-8")
     
-    src_path = 'test_files/lang1.txt'  # english
-    tgt_path = 'test_files/lang2.txt'  # french
-    p_cond = compute_conditional_perplexity('eng_Latn', src_path, "fra_Latn", tgt_path, base_model, batch_size=6)
-    p_unigram = compute_unigram_perplexity(tgt_path, base_model)
+    # src_path = 'test_files/lang1.txt'  # english
+    # tgt_path = 'test_files/lang2.txt'  # french
+    # p_cond = compute_conditional_perplexity('eng_Latn', src_path, "fra_Latn", tgt_path, base_model, batch_size=6)
+    # p_unigram = compute_unigram_perplexity(tgt_path, base_model)
     
-    src_path = "test_files/blank.txt"
-    p_lm = compute_conditional_perplexity("eng_Latn", src_path, "fra_Latn", tgt_path, base_model)
-        
-    
-    print(p_cond)
-    print(p_unigram)
-    print(p_lm)
-    exit()
-        
-    for lang in langs:
-        src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
-        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/eng_Latn"
-        print(f'eng_Latn -> {lang}: {compute_conditional_perplexity(lang, src_path, "eng_Latn", tgt_path, base_model)}')
-        
-        src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/eng_Latn"
-        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"        
-        print(f'{lang} -> eng_Latn: {compute_conditional_perplexity("eng_Latn", src_path, lang, tgt_path, base_model)}')
-        
-        src_path = "test_files/blank.txt"
-        tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"                
-        print(f'{lang}: {compute_conditional_perplexity("eng_Latn", src_path, lang, tgt_path, base_model)}')
-        
-        
+    # src_path = "test_files/blank.txt"
+    # p_lm = compute_conditional_perplexity("eng_Latn", src_path, "fra_Latn", tgt_path, base_model)
+
+    with open("data_stuff/seed_perps.txt", "a") as file:
+        for lang in langs:
+            src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
+            tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/eng_Latn"
+            file.write(f'{lang} -> eng_Latn: {compute_conditional_perplexity(lang, src_path, "eng_Latn", tgt_path, base_model, batch_size=256)}')
+            print("actually wrote something lol!")
+            
+            src_path = "test_files/blank.txt"
+            tgt_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"                
+            file.write(f'{lang} LM: {compute_conditional_perplexity("eng_Latn", src_path, lang, tgt_path, base_model, batch_size=256)}')
+            print("actually wrote something again!")
+            
+            src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
+            perplexity = compute_unigram_perplexity(src_path, hf_tokenizer, model_used=True)
+            file.write(f'{lang} unigram perplexity: {perplexity}\n')
+            print("AM I THE PROBLEM")
+
+            src_path = f"/mnt/storage/hopkins/data/nllb/seed/seed/{lang}"
+            perplexity = compute_unigram_perplexity(src_path, byte_tokenizer, model_used=False)
+            file.write(f'{lang} byte unigram perplexity: {perplexity}\n')
+            print("no i'm the problem!")
 
     print("done writing data idiot")
     # with open("seedperp.txt", "a") as file:
