@@ -128,7 +128,7 @@ class MixtureOfBitexts:
         for bitext in config['bitexts']:
             src = (bitext['corpus'], bitext['src'])
             tgt = (bitext['corpus'], bitext['tgt'])
-            lines = bitext["train_lines"] if split == "train" else None
+            lines = bitext["train_lines"] if split == "train" and "train_lines" in bitext else None
             bitexts[(src, tgt)] = Bitext(all_corpora[src], all_corpora[tgt], lines)
         params = config["finetuning_parameters"]
         return MixtureOfBitexts(bitexts, params['batch_size'], sampling_probs=None, only_once_thru=only_once_thru)

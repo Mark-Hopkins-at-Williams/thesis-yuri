@@ -25,6 +25,8 @@ from permutations import (
 )
 from validate import translate_tokenized_mixture_of_bitexts, evaluate_translations
 from tokenization import NllbTokenizer, HuggingfaceTokenizer
+import torch.nn.functional as F
+import torch.nn as nn
 
 def cleanup():
     gc.collect()
@@ -53,23 +55,25 @@ def prepare_model(base_model: str, freeze_decoder: bool, freeze_encoder: bool, s
             param.requires_grad = False
     else:
         print("--> encoder NOT frozen <--")
+    model = model.model.encoder
     if USE_CUDA:
         torch.cuda.set_device(0)
         model.cuda()
     return model
 
 
-def evaluate(model, dev_data, batches: int = 100):
-    model.eval()
-    dev_losses = []
-    with torch.no_grad():
-        for _ in range(batches):
-            x, y, _, _ = dev_data.next_batch()
-            x = x.to(model.device)
-            y = y.to(model.device)
-            loss = model(**x, labels=y.input_ids).loss
-            dev_losses.append(loss.item())
-    return np.mean(dev_losses)
+# TODO: this needs to be updated!
+# def evaluate(model, dev_data, batches: int = 100):
+#     model.eval()
+#     dev_losses = []
+#     with torch.no_grad():
+#         for _ in range(batches):
+#             x, y, _, _ = dev_data.next_batch()
+#             x = x.to(model.device)
+#             y = y.to(model.device)
+#             loss = model(**x, labels=y.input_ids).loss
+#             dev_losses.append(loss.item())
+#     return np.mean(dev_losses)
 
 
 def plot_losses(train_x, train_y, dev_x, dev_y, out_path: str):
@@ -81,6 +85,27 @@ def plot_losses(train_x, train_y, dev_x, dev_y, out_path: str):
     plt.legend()
     plt.grid(True)
     plt.savefig(out_path)
+
+
+class SimpleAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, e, f):
+        # x: (batch, seq_len, embed_dim)
+        Q = e
+        K = f
+        V = f
+
+        # Compute scaled dot-product attention
+        print(e)
+        print(f)
+        exit()
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / (e.size(-1) ** 0.5)
+        weights = F.softmax(scores, dim=-1)
+        output = torch.matmul(weights, V)
+
+        return output, weights
 
 
 def finetune(
@@ -97,11 +122,11 @@ def finetune(
     should_finetune: bool = True
 ):
     print(f"Training {model_dir}")
-    model = prepare_model(base_model, freeze_decoder, freeze_encoder, should_finetune)
+    encoder = prepare_model(base_model, freeze_decoder, freeze_encoder, should_finetune)
     
     if should_finetune:
         optimizer = Adafactor(
-            [p for p in model.parameters() if p.requires_grad],
+            [p for p in encoder.parameters() if p.requires_grad],
             scale_parameter=False,
             relative_step=False,
             lr=1e-4,
@@ -111,7 +136,7 @@ def finetune(
         scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=1000)
     else:
         optimizer = Adafactor(
-            model.parameters(),
+            encoder.parameters(),
             scale_parameter=True,
             relative_step=True,
             lr=None,  # Required when using relative_step
@@ -124,14 +149,29 @@ def finetune(
     train_losses, train_plot_x, train_plot_y = [], [], []
     dev_plot_x, dev_plot_y = [], []
     best_dev_loss, steps_since_best = None, 0
-
+    attn = SimpleAttention()
+    attn.to(encoder.device)
     for i in tqdm(range(training_steps)):
         try:
-            model.train()
-            x, y, _, _ = train_data.next_batch()
-            x = x.to(model.device)
-            y = y.to(model.device)
-            loss = model(**x, labels=y.input_ids).loss
+            encoder.train()
+            src, tgt, _, _ = train_data.next_batch()
+            src = src.to(encoder.device)
+            tgt = tgt.to(encoder.device)
+            
+            src_enc = encoder(**src).last_hidden_state[0]
+            tgt_enc = encoder(**tgt).last_hidden_state[0]
+            
+            print(src_enc.shape)
+            print(tgt_enc.shape)
+            exit()
+            
+            out, weights = attn(src_enc, tgt_enc)  # [seq_len, hidden_dim]
+
+            # Compute cosine similarity per token between E and attended context
+            token_scores = F.cosine_similarity(src_enc, out, dim=-1)  # [seq_len]
+            print(token_scores.shape)
+            exit()
+            #loss = model(**x, labels=y.input_ids).loss
             loss.backward()
             train_losses.append(loss.item())
             optimizer.step()
@@ -156,7 +196,7 @@ def finetune(
 
         if i > 0 and i % validate_every == 0:
             print("Validating...")
-            dev_loss = evaluate(model, dev_data)
+            dev_loss = evaluate(encoder, dev_data)
             print(f"Dev loss: {dev_loss:.4f}")
             dev_plot_x.append(i)
             dev_plot_y.append(dev_loss)
@@ -174,7 +214,7 @@ def finetune(
                 print("Saving new best model.")
                 best_dev_loss = dev_loss
                 steps_since_best = 0
-                model.save_pretrained(model_dir)  # causes warning?
+                encoder.save_pretrained(model_dir)  # causes warning?
             else:
                 steps_since_best += 1
                 print(f"No improvement. Patience: {patience - steps_since_best}")
