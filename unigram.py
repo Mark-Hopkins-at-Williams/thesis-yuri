@@ -12,7 +12,7 @@ def compute_unigram_distribution(src_path, tokenizer, model_used=False):
     with open(src_path, 'r') as file:
         for line in file:
             inputs = tokenizer(line.strip()) # returns python lists if using model
-            token_vals = inputs.input_ids       
+            token_vals = inputs["input_ids"]       
             if model_used:
                 token_freqs.update(token_vals[1:])   
                 total_tokens += len(token_vals) - 1 # subtract 1 bc language token included? 
@@ -28,7 +28,7 @@ def compute_unigram_perplexity(src_path, tokenizer, model_used=False):
     with open(src_path, 'r') as file:
         for line in file:
             inputs = tokenizer(line.strip())#, return_tensors="pt")
-            token_vals = inputs.input_ids
+            token_vals = inputs["input_ids"]
             for token in token_vals[1:len(token_vals)]:
                 token_prob = unigram_distribution[token]
                 perp += -math.log(token_prob)
