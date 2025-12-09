@@ -1,7 +1,7 @@
 import random
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
-
+import torch
 from tokenization import Tokenizer
 
 CorpusId = Tuple[str, str] # typedef
@@ -144,12 +144,14 @@ class TokenizedMixtureOfBitexts:
         mixture_of_bitexts: MixtureOfBitexts,
         tokenizer: Tokenizer,
         lang_codes: Dict[CorpusId, str],
-        permutation_map: Dict[CorpusId, Callable[[int], int]] = dict()
+        permutation_map: Dict[CorpusId, Callable[[int], int]] = dict(),
+        use_alt_pad_token_for_tgt_lang = True
     ):
         self.mixture_of_bitexts = mixture_of_bitexts
         self.tokenizer = tokenizer
         self.lang_codes = lang_codes
         self.permutation_map = permutation_map
+        self.use_alt_pad_token_for_tgt_lang = use_alt_pad_token_for_tgt_lang
 
     def _tokenize(self, sents: List[str], corpus: CorpusId, alt_pad_token: int = None):
         tokens = self.tokenizer(sents, lang_code = self.lang_codes[corpus])
@@ -167,5 +169,8 @@ class TokenizedMixtureOfBitexts:
             return None
         lang1_sents, lang2_sents, lang1, lang2 = batch
         lang1_tokenized = self._tokenize(lang1_sents, lang1)
-        lang2_tokenized = self._tokenize(lang2_sents, lang2, alt_pad_token=-100)
+        if self.use_alt_pad_token_for_tgt_lang:
+            lang2_tokenized = self._tokenize(lang2_sents, lang2, alt_pad_token=-100)
+        else:
+            lang2_tokenized = self._tokenize(lang2_sents, lang2)       
         return lang1_tokenized, lang2_tokenized, lang1, lang2

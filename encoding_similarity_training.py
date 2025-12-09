@@ -57,7 +57,7 @@ def prepare_model(base_model: str, freeze_decoder: bool, freeze_encoder: bool, s
         print("--> encoder NOT frozen <--")
     model = model.model.encoder
     if USE_CUDA:
-        torch.cuda.set_device(0)
+        torch.cuda.set_device(5)
         model.cuda()
     return model
 
@@ -100,7 +100,7 @@ class SimpleAttention(nn.Module):
         # Compute scaled dot-product attention
         print(e)
         print(f)
-        exit()
+        #exit()
         scores = torch.matmul(Q, K.transpose(-2, -1)) / (e.size(-1) ** 0.5)
         weights = F.softmax(scores, dim=-1)
         output = torch.matmul(weights, V)
@@ -155,21 +155,48 @@ def finetune(
         try:
             encoder.train()
             src, tgt, _, _ = train_data.next_batch()
+            # smaller, larger = tgt, src
+            # if src['input_ids'].shape[-1] < tgt['input_ids'].shape[-1]:
+            #     smaller, larger = src, tgt
+            # smaller_size = smaller['input_ids'].shape[-1]
+            # larger_size = larger['input_ids'].shape[-1]
+            # pad_token_id = train_data.tokenizer.get_special_tokens()['<pad>']
+            # padding = torch.full(smaller['input_ids'].shape[:-1] + ((larger_size-smaller_size),), pad_token_id)
+            # attn_padding = torch.zeros(smaller['input_ids'].shape[:-1] + ((larger_size-smaller_size),))
+            
+            # smaller['input_ids'] = torch.cat((smaller['input_ids'], padding), dim=-1)           
+            # smaller['attention_mask'] = torch.cat((smaller['attention_mask'], attn_padding), dim=-1)           
+            
+            
+            # src_and_tgt_ids = torch.stack([src['input_ids'], tgt['input_ids']]).to(encoder.device)
+            # src_and_tgt_attn_mask = torch.stack([src['attention_mask'], tgt['attention_mask']]).to(encoder.device)
+            # src_and_tgt = {'input_ids': src_and_tgt_ids, 
+            #                'attention_mask': src_and_tgt_attn_mask}
+            
+            # print(src['input_ids'].shape)
+            # print(tgt['input_ids'].shape)
+            #print(src_and_tgt['input_ids'].shape)
+            # print(src['attention_mask'].shape)
+            # print(tgt['attention_mask'].shape)
+            # print(src_and_tgt['attention_mask'].shape)
             src = src.to(encoder.device)
             tgt = tgt.to(encoder.device)
             
-            src_enc = encoder(**src).last_hidden_state[0]
-            tgt_enc = encoder(**tgt).last_hidden_state[0]
+            # print(src_and_tgt['input_ids'])
+            
+            src_enc = encoder(**src).last_hidden_state
+            tgt_enc = encoder(**tgt).last_hidden_state
             
             print(src_enc.shape)
             print(tgt_enc.shape)
-            exit()
             
-            out, weights = attn(src_enc, tgt_enc)  # [seq_len, hidden_dim]
+            # TODO: from here on batching may not work
+            out, weights = attn(src_enc[0], tgt_enc[0])  # [seq_len, hidden_dim]
+            
 
             # Compute cosine similarity per token between E and attended context
             token_scores = F.cosine_similarity(src_enc, out, dim=-1)  # [seq_len]
-            print(token_scores.shape)
+            print(token_scores)
             exit()
             #loss = model(**x, labels=y.input_ids).loss
             loss.backward()
@@ -282,10 +309,12 @@ def main():
         
     save_permutation_map(pmap, Path(model_dir) / "permutations.json")
     tokenized_train = TokenizedMixtureOfBitexts(
-        train_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap
+        train_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap, 
+        use_alt_pad_token_for_tgt_lang=False
     )
     tokenized_dev = TokenizedMixtureOfBitexts(
-        dev_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap
+        dev_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap,
+        use_alt_pad_token_for_tgt_lang=False
     )
     finetune(
         tokenized_train,
