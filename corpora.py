@@ -1,7 +1,6 @@
 import random
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
-import torch
 from tokenization import Tokenizer
 
 CorpusId = Tuple[str, str] # typedef
@@ -26,7 +25,6 @@ class MultifileBitext(IterableDataset):
                         break
 
     def __iter__(self) -> Iterator[Tuple[str, str]]:
-        
         return zip(
             self.line_streamer(0), self.line_streamer(1)
         )
