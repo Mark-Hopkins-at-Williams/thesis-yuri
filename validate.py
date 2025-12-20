@@ -118,8 +118,54 @@ def evaluate_experiment(experiment_dir):
     logger("...scoring complete.")
 
 
+def evaluate_model(model_name, config_file):
+    with open(config_file) as reader:
+        config = json.load(reader)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    if USE_CUDA:
+        model.cuda()
+    lang_codes = harvest_language_codes(config)
+    tokenizer = initialize_tokenizer(config)
+    pmap = dict()
+    test_data = MixtureOfBitexts.create_from_config(config, "test", only_once_thru=True)
+    tokenized_test = TokenizedMixtureOfBitexts(
+        test_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap
+    )
+    logger(f"Translating test data")    
+    translations = translate_tokenized_mixture_of_bitexts(
+        tokenized_test, model, tokenizer, lang_codes, pmap
+    )
+    with open("translations.json", "w") as writer:
+        json.dump(translations, writer)
+    logger("...translation complete.")
+    logger(f"Collating reference translations")    
+    test_data = MixtureOfBitexts.create_from_config(config, "test", only_once_thru=True)
+    references = dict()
+    batch = test_data.next_batch()
+    while batch is not None:
+        _, tgt, src_lang, tgt_lang = batch
+        src_code = lang_codes[src_lang]
+        tgt_code = lang_codes[tgt_lang]
+        key = "->".join([src_code, tgt_code])
+        if key not in references:
+            references[key] = []
+        references[key].extend(tgt)
+        batch = test_data.next_batch()
+    with open("references.json", "w") as writer:
+        json.dump(references, writer)
+    logger("...references complete.")
+    logger(f"Scoring translations")    
+    scores = dict()
+    for key in translations:
+        scores[key] = evaluate_translations(translations[key], references[key])
+    with open("scores.json", "w") as writer:
+        json.dump(scores, writer)
+    logger("...scoring complete.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate finetuning experiment.")
     parser.add_argument("--dir", type=str, required=True, help="Experiment directory.")
     args = parser.parse_args()
-    evaluate_experiment(args.dir)
+    #evaluate_experiment(args.dir)
+    evaluate_model("facebook/nllb-200-distilled-600M", "examples/nllb_seed_config_small.json")
