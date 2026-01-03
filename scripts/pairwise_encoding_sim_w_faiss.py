@@ -7,13 +7,13 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use("Agg")
 import faiss
-from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
+from ..corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
 from transformers import AutoModelForSeq2SeqLM
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-from tokenization import NllbTokenizer, HuggingfaceTokenizer
+from ..tokenization import NllbTokenizer, HuggingfaceTokenizer
 
 
 USE_CUDA = torch.cuda.is_available()
@@ -109,7 +109,6 @@ def main():
         (c, k): config['corpora'][c][k]['lang_code']
         for c in config['corpora'] for k in config['corpora'][c]
     }
-    LANGS = list(lang_codes.values())
 
     # Load model
     logger('loading model...')
