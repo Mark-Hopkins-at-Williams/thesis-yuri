@@ -70,11 +70,13 @@ def finetune(model, train_data, dev_data, model_dir, ft_params):
             encoder.eval()
             src, tgt, _, _ = train_data.next_batch()
             src = src.to(encoder.device)
-            tgt = tgt.to(encoder.device)                        
+            tgt = tgt.to(encoder.device)
             src_enc = encoder(**src).last_hidden_state
-            tgt_enc = encoder(**tgt).last_hidden_state           
+            tgt_enc = encoder(**tgt).last_hidden_state
             out, _ = attn(src_enc, tgt_enc)
-            token_scores = -torch.log(1 + F.cosine_similarity(src_enc, out, dim=-1)/2)  # [seq_len]
+            token_scores = -torch.log(
+                1 + F.cosine_similarity(src_enc, out, dim=-1) / 2
+            )  # [seq_len]
             loss = token_scores.mean()
             loss.backward()
             train_losses.append(loss.item())
@@ -84,12 +86,12 @@ def finetune(model, train_data, dev_data, model_dir, ft_params):
                 scheduler.step()
 
             model.train()
-            #x, y, _, _ = train_data.next_batch()
-            #x = x.to(model.device)
-            #y = y.to(model.device)
+            # x, y, _, _ = train_data.next_batch()
+            # x = x.to(model.device)
+            # y = y.to(model.device)
             loss = model(**src, labels=tgt.input_ids).loss
             loss.backward()
-            #train_losses.append(loss.item())
+            # train_losses.append(loss.item())
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
             if scheduler is not None:
