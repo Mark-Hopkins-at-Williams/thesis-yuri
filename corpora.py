@@ -88,6 +88,7 @@ class MixtureOfBitexts:
             p / total for p in (sampling_probs or [1.0] * len(bitexts))
         ]
 
+        self.only_once_thru = only_once_thru
         self.completed_bitexts = set()
 
     def _create_iterator(
@@ -114,7 +115,7 @@ class MixtureOfBitexts:
                     self.completed_bitexts.add(lang_pair)
                 else:  # start a new iterator for the chosen bitext
                     self.batch_iters[lang_pair] = self._create_iterator(lang_pair)
-        if still_choosing and self.only_once_thru:
+        if still_choosing:
             return None
         else:
             return lang1_sents, lang2_sents, lang_pair[0], lang_pair[1]
