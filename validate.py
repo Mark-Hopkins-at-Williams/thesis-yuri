@@ -20,7 +20,7 @@ def translate(
     a=32,
     b=3,
     num_beams=4,
-    **kwargs
+    **kwargs,
 ):
     model.eval()
     result = model.generate(
@@ -28,7 +28,7 @@ def translate(
         forced_bos_token_id=tokenizer.get_special_tokens()[tgt_lang],
         max_new_tokens=int(a + b * src_tokenized.input_ids.shape[1]),
         num_beams=num_beams,
-        **kwargs
+        **kwargs,
     )
     result = result.to("cpu")
     if permutation is not None:
@@ -86,14 +86,14 @@ def evaluate_experiment(experiment_dir):
     tokenized_test = TokenizedMixtureOfBitexts(
         test_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap
     )
-    logger(f"Translating test data")    
+    logger(f"Translating test data")
     translations = translate_tokenized_mixture_of_bitexts(
         tokenized_test, model, tokenizer, lang_codes, pmap
     )
     with open(Path(experiment_dir) / "translations.json", "w") as writer:
         json.dump(translations, writer)
     logger("...translation complete.")
-    logger(f"Collating reference translations")    
+    logger(f"Collating reference translations")
     test_data = MixtureOfBitexts.create_from_config(config, "test", only_once_thru=True)
     references = dict()
     batch = test_data.next_batch()
@@ -109,7 +109,7 @@ def evaluate_experiment(experiment_dir):
     with open(Path(experiment_dir) / "references.json", "w") as writer:
         json.dump(references, writer)
     logger("...references complete.")
-    logger(f"Scoring translations")    
+    logger(f"Scoring translations")
     scores = dict()
     for key in translations:
         scores[key] = evaluate_translations(translations[key], references[key])
@@ -131,14 +131,14 @@ def evaluate_model(model_name, config_file):
     tokenized_test = TokenizedMixtureOfBitexts(
         test_data, tokenizer, lang_codes=lang_codes, permutation_map=pmap
     )
-    logger(f"Translating test data")    
+    logger(f"Translating test data")
     translations = translate_tokenized_mixture_of_bitexts(
         tokenized_test, model, tokenizer, lang_codes, pmap
     )
     with open("translations.json", "w") as writer:
         json.dump(translations, writer)
     logger("...translation complete.")
-    logger(f"Collating reference translations")    
+    logger(f"Collating reference translations")
     test_data = MixtureOfBitexts.create_from_config(config, "test", only_once_thru=True)
     references = dict()
     batch = test_data.next_batch()
@@ -154,7 +154,7 @@ def evaluate_model(model_name, config_file):
     with open("references.json", "w") as writer:
         json.dump(references, writer)
     logger("...references complete.")
-    logger(f"Scoring translations")    
+    logger(f"Scoring translations")
     scores = dict()
     for key in translations:
         scores[key] = evaluate_translations(translations[key], references[key])
@@ -167,5 +167,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate finetuning experiment.")
     parser.add_argument("--dir", type=str, required=True, help="Experiment directory.")
     args = parser.parse_args()
-    #evaluate_experiment(args.dir)
-    evaluate_model("facebook/nllb-200-distilled-600M", "examples/nllb_seed_config_small.json")
+    # evaluate_experiment(args.dir)
+    evaluate_model(
+        "facebook/nllb-200-distilled-600M", "examples/nllb_seed_config_small.json"
+    )

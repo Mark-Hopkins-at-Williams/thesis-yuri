@@ -11,6 +11,7 @@ USE_CUDA = torch.cuda.is_available()
 # Selected languages
 LANGS = ["eng_Latn", "ary_Arab", "dzo_Tibt", "mag_Deva", "knc_Latn", "shn_Mymr"]
 
+
 def mean_encoder_output(model, tokenized_data, lang_code):
     """Compute mean pooled encoder output for a language."""
     model.eval()
@@ -31,6 +32,7 @@ def mean_encoder_output(model, tokenized_data, lang_code):
         return None
     return torch.cat(embeddings, dim=0).mean(dim=0).numpy()  # final mean vector
 
+
 def compute_distance_matrix(model, tokenized_data):
     vectors = {}
     for lang in LANGS:
@@ -43,6 +45,7 @@ def compute_distance_matrix(model, tokenized_data):
             dist_matrix[i, j] = np.linalg.norm(vectors[lang_i] - vectors[lang_j])
     return dist_matrix
 
+
 def plot_heatmap(matrix, labels, out_file="heatmap.png"):
     plt.figure(figsize=(6, 5))
     im = plt.imshow(matrix, cmap="viridis")
@@ -52,6 +55,7 @@ def plot_heatmap(matrix, labels, out_file="heatmap.png"):
     plt.title("Mean L2 Distance between Languages")
     plt.tight_layout()
     plt.savefig(out_file)
+
 
 def main():
     # Load model
@@ -64,18 +68,22 @@ def main():
     with open("config.json") as f:
         config = json.load(f)
     lang_codes = {
-        (c, k): config['corpora'][c][k]['lang_code'] 
-        for c in config['corpora'] for k in config['corpora'][c]
+        (c, k): config["corpora"][c][k]["lang_code"]
+        for c in config["corpora"]
+        for k in config["corpora"][c]
     }
     dev_data = MixtureOfBitexts.create_from_config(config, "dev", only_once_thru=True)
     tokenizer = load_tokenizer(model_name)
-    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128, lang_codes=lang_codes, permutation_map={})
+    tokenized_dev = TokenizedMixtureOfBitexts(
+        dev_data, tokenizer, max_length=128, lang_codes=lang_codes, permutation_map={}
+    )
 
     # Compute distance matrix
     dist_matrix = compute_distance_matrix(model, tokenized_dev)
 
     # Plot
     plot_heatmap(dist_matrix, LANGS, out_file="language_heatmap.png")
+
 
 if __name__ == "__main__":
     main()
