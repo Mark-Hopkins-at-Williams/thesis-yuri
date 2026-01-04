@@ -1,25 +1,33 @@
 import random
-import sys
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 from torch.utils.data import DataLoader, IterableDataset
-from transformers import AutoTokenizer
-import warnings
+from tokenization import Tokenizer
 
-def load_tokenizer(model_name: str):
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="`clean_up_tokenization_spaces` was not set.*",
-            category=FutureWarning,
-            module="transformers.tokenization_utils_base",
+CorpusId = Tuple[str, str] # typedef
+
+class MultifileBitext(IterableDataset):
+    def __init__(self, lang1_files: List[str], lang2_files: List[str], lines: Optional[List[Tuple[int, int]]] = None):
+        self.lang1_files = lang1_files
+        self.lang2_files = lang2_files
+        self.lines = lines        
+        
+    def line_streamer(self, lang_index) -> Iterator[str]:
+        lang_files = self.lang1_files if lang_index == 0 else self.lang2_files
+        for file_index in range(len(self.lang1_files)):
+            file_path = lang_files[file_index]
+            current_line = 0
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:  
+                    if self.lines is None or self.lines[file_index][0] <= current_line < self.lines[file_index][1]:       
+                        yield line.rstrip("\n")                
+                    current_line += 1
+                    if self.lines is not None and current_line >= self.lines[file_index][1]:
+                        break
+
+    def __iter__(self) -> Iterator[Tuple[str, str]]:
+        return zip(
+            self.line_streamer(0), self.line_streamer(1)
         )
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
-        except OSError:
-            sys.stderr.write('Tokenizer not found. Using NLLB tokenizer instead.\n')
-            sys.stderr.flush()
-            tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
-    return tokenizer
 
 
 class Bitext(IterableDataset):
@@ -118,7 +126,7 @@ class MixtureOfBitexts:
         for bitext in config['bitexts']:
             src = (bitext['corpus'], bitext['src'])
             tgt = (bitext['corpus'], bitext['tgt'])
-            lines = bitext["train_lines"] if split == "train" else None
+            lines = bitext["train_lines"] if split == "train" and "train_lines" in bitext else None
             bitexts[(src, tgt)] = Bitext(all_corpora[src], all_corpora[tgt], lines)
         params = config["finetuning_parameters"]
         return MixtureOfBitexts(bitexts, params['batch_size'], sampling_probs=None, only_once_thru=only_once_thru)
@@ -132,32 +140,24 @@ class TokenizedMixtureOfBitexts:
     def __init__(
         self,
         mixture_of_bitexts: MixtureOfBitexts,
-        tokenizer: AutoTokenizer,
-        max_length: int,
-        lang_codes: Dict[Tuple[str, str], str],
-        permutation_map: Dict[str, Callable[[int], int]] = dict()
+        tokenizer: Tokenizer,
+        lang_codes: Dict[CorpusId, str],
+        permutation_map: Dict[CorpusId, Callable[[int], int]] = dict(),
+        use_alt_pad_token_for_tgt_lang = True
     ):
         self.mixture_of_bitexts = mixture_of_bitexts
         self.tokenizer = tokenizer
-        self.max_length = max_length
         self.lang_codes = lang_codes
         self.permutation_map = permutation_map
+        self.use_alt_pad_token_for_tgt_lang = use_alt_pad_token_for_tgt_lang
 
-    def _tokenize(self, sents: List[str], lang: str, alt_pad_token: int = None):
-        self.tokenizer.src_lang = self.lang_codes[lang]
-        tokens = self.tokenizer(
-            sents,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-        )
+    def _tokenize(self, sents: List[str], corpus: CorpusId, alt_pad_token: int = None):
+        tokens = self.tokenizer(sents, lang_code = self.lang_codes[corpus])
         if alt_pad_token is not None:
-            tokens.input_ids[tokens.input_ids == self.tokenizer.pad_token_id] = (
-                alt_pad_token
-            )
-        if lang in self.permutation_map: # apply the permutation
-            p = self.permutation_map[lang]
+            pad_token_id = self.tokenizer.get_special_tokens()['<pad>']
+            tokens.input_ids[tokens.input_ids == pad_token_id] = alt_pad_token            
+        if corpus in self.permutation_map: # apply the permutation
+            p = self.permutation_map[corpus]
             tokens.input_ids.apply_(p) # modifies in-place
         return tokens
 
@@ -167,5 +167,8 @@ class TokenizedMixtureOfBitexts:
             return None
         lang1_sents, lang2_sents, lang1, lang2 = batch
         lang1_tokenized = self._tokenize(lang1_sents, lang1)
-        lang2_tokenized = self._tokenize(lang2_sents, lang2, alt_pad_token=-100)
+        if self.use_alt_pad_token_for_tgt_lang:
+            lang2_tokenized = self._tokenize(lang2_sents, lang2, alt_pad_token=-100)
+        else:
+            lang2_tokenized = self._tokenize(lang2_sents, lang2)       
         return lang1_tokenized, lang2_tokenized, lang1, lang2

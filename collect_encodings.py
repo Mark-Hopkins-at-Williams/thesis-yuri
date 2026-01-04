@@ -1,69 +1,13 @@
-import os
-import shutil
-import sys
-from pathlib import Path
-from tqdm import tqdm
-from permutations import (create_random_permutation_with_fixed_points, save_permutation_map,)
-from validate import translate_tokenized_mixture_of_bitexts, evaluate_translations
-import matplotlib.pyplot as plt
-import numpy as np
-
 import argparse
-import gc
-import json
-import faiss
-import matplotlib
-matplotlib.use("Agg")
-
-
-import torch
-
-from transformers import (
-    Adafactor,
-    AutoModelForSeq2SeqLM,
-    AutoConfig,
-    get_constant_schedule_with_warmup,
-)
 from configure import USE_CUDA
 from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
+import json
+import faiss
+import torch
+from transformers import AutoModelForSeq2SeqLM
 
 
-
-def cleanup():
-    gc.collect()
-    torch.cuda.empty_cache()
-
-
-def prepare_model(base_model: str, freeze_decoder: bool, freeze_encoder: bool, should_finetune: bool):
-    if should_finetune:
-        model = AutoModelForSeq2SeqLM.from_pretrained(base_model) 
-        print('loaded pretrained model')
-    else: 
-        model_config = AutoConfig.from_pretrained(base_model)
-        model = AutoModelForSeq2SeqLM.from_config(model_config)
-        print('loaded architecture only')
-    if hasattr(model.config, "max_length"):  # this should be in a GenerationConfig
-        delattr(model.config, "max_length")
-    if freeze_decoder:
-        print("--> DECODER FROZEN <--")
-        for param in model.get_decoder().parameters():
-            param.requires_grad = False
-    else:
-        print("--> decoder NOT frozen <--")
-    if freeze_encoder:
-        print("--> ENCODER FROZEN <--")
-        for param in model.get_encoder().parameters():
-            param.requires_grad = False
-    else:
-        print("--> encoder NOT frozen <--")
-    if USE_CUDA:
-        torch.cuda.set_device(0)
-        model.cuda()
-    return model
-
-
-def evaluate(model, dev_data, batches: int = 100):
-    
+def evaluate(model, dev_data, batches: int = 100):    
     model.eval()
     encoder = model.model.encoder
     with torch.no_grad():
@@ -73,9 +17,10 @@ def evaluate(model, dev_data, batches: int = 100):
             y = y.to(model.device)
             x_encoding = encoder(**x)
             y_encoding = encoder(**y)
-            xq = x_encoding.last_hidden_state[0].cpu().numpy()
-            xb = y_encoding.last_hidden_state[0].cpu().numpy()
-            
+            xq = x_encoding.last_hidden_state[0]#.cpu().numpy()
+            xb = y_encoding.last_hidden_state[0]#.cpu().numpy()
+            print(xq.shape)
+            print(xb.shape)
             index = faiss.IndexFlatL2(1024)
             index.add(xb)
             k = 1

@@ -7,12 +7,13 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use("Agg")
 import faiss
-from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts, load_tokenizer
+from ..corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
 from transformers import AutoModelForSeq2SeqLM
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from ..tokenization import NllbTokenizer, HuggingfaceTokenizer
 
 
 USE_CUDA = torch.cuda.is_available()
@@ -93,6 +94,9 @@ def plot_clustermap(matrix, labels, out_file="language_clustermap.png"):
     plt.savefig(out_file, bbox_inches="tight")
     print(f"Saved clustermap to {out_file}")
 
+def logger(s):
+    sys.stderr.write(f'{s}\n')
+    sys.stderr.flush()
 
 
 def main():
@@ -105,26 +109,35 @@ def main():
         (c, k): config['corpora'][c][k]['lang_code']
         for c in config['corpora'] for k in config['corpora'][c]
     }
-    LANGS = list(lang_codes.values())
 
     # Load model
+    logger('loading model...')
+    
     model_name = config["finetuning_parameters"]["base_model"]
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     if USE_CUDA:
         model.cuda()
 
     # Load dev data and tokenize
+    logger('tokenizing dev data...')
     dev_data = MixtureOfBitexts.create_from_config(config, "dev", only_once_thru=True)
-    tokenizer = load_tokenizer(model_name)
-    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer, max_length=128,
+    
+    if model_name == "facebook/nllb-200-distilled-600M":   
+        tokenizer = NllbTokenizer("600M", max_length=128) # set max length?
+    elif model_name == "facebook/nllb-200-distilled-1.3B": 
+        tokenizer = NllbTokenizer("1.3B", max_length=128)
+    else:
+        tokenizer = HuggingfaceTokenizer(model_name, max_length=128)
+    
+    tokenized_dev = TokenizedMixtureOfBitexts(dev_data, tokenizer,
                                               lang_codes=lang_codes, permutation_map={})
 
     # Compute fine-grained embeddings
-    print('computing embeddings...')
+    logger('computing embeddings...')
     embeddings = compute_language_embeddings(model, tokenized_dev, lang_codes)
 
     # Compute FAISS heatmap
-    print('computing heatmap...')
+    logger('computing heatmap...')
     heatmap, lang_list = compute_faiss_heatmap(embeddings)
 
     # Plot heatmap
