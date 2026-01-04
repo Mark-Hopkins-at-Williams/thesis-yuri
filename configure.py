@@ -19,6 +19,9 @@ class FinetuningParameters:
     num_training_steps: int
     freeze_encoder: bool
     freeze_decoder: bool
+    gradient_accumulation_steps: int
+    max_grad_norm: float
+    dev_batches: int
 
 
 def read_finetuning_params(config):
@@ -31,9 +34,12 @@ def read_finetuning_params(config):
         validate_every=params.get("validate_every", 500),
         patience=params.get("patience", 1000000000),
         batch_size=params["batch_size"],
-        num_training_steps = params["num_steps"],
+        num_training_steps=params["num_steps"],
         freeze_decoder=params.get("freeze_decoder", False),
-        freeze_encoder=params.get("freeze_encoder", False)
+        freeze_encoder=params.get("freeze_encoder", False),
+        gradient_accumulation_steps=params.get("gradient_accumulation_steps", 1),
+        max_grad_norm=params.get("max_grad_norm", 1.0),
+        dev_batches=params.get("dev_batches", 100),
     )
     return f_params
 
@@ -90,31 +96,3 @@ def create_permutations(config, tokenizer):
                 pmap[(corpus, language)] = permutations[permutation_index]
     # save_permutation_map(pmap, Path(model_dir) / "permutations.json")
     return pmap
-        
-
-
-
-def more():
-
-
-    train_data = MixtureOfBitexts.create_from_config(
-        config, "train", only_once_thru=False
-    )
-    dev_data = MixtureOfBitexts.create_from_config(config, "dev", only_once_thru=False)
-    
-
-    
-    tokenized_train = TokenizedMixtureOfBitexts(
-        train_data,
-        tokenizer,
-        lang_codes=lang_codes,
-        permutation_map=pmap,
-        use_alt_pad_token_for_tgt_lang=False,
-    )
-    tokenized_dev = TokenizedMixtureOfBitexts(
-        dev_data,
-        tokenizer,
-        lang_codes=lang_codes,
-        permutation_map=pmap,
-        use_alt_pad_token_for_tgt_lang=False,
-    )
