@@ -1,4 +1,5 @@
 import unittest
+from tokenization import ByteTokenizer
 from tokenization import NllbTokenizer
 from torch import tensor
 
@@ -67,6 +68,39 @@ class TestTokenization(unittest.TestCase):
         self.assertEqual(special_tokens["</s>"], 2)
         self.assertEqual(special_tokens["<unk>"], 3)
         self.assertEqual(special_tokens["<mask>"], 256203)
+
+    def test_byte_tokenizer1(self):
+        tokenizer = ByteTokenizer()
+        lines = ["cat"]
+        tokenized = tokenizer(lines)
+        expected = {"input_ids": [[99, 97, 116, 256]]}
+        self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
+
+    def test_byte_tokenizer2(self):
+        tokenizer = ByteTokenizer()
+        lines = ["cat", "dogs"]
+        tokenized = tokenizer(lines)
+        expected = {"input_ids": [[99, 97, 116, 256, 257], [100, 111, 103, 115, 256]]}
+        self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
+
+    def test_byte_tokenizer3(self):
+        tokenizer = ByteTokenizer()
+        lines = ["cat", "안녕"]
+        tokenized = tokenizer(lines)
+        expected = {
+            "input_ids": [
+                [99, 97, 116, 256, 257, 257, 257],
+                [236, 149, 136, 235, 133, 149, 256],
+            ]
+        }
+        self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
+
+    def test_byte_tokenizer4(self):
+        tokenizer = ByteTokenizer()
+        lines = "cat"
+        tokenized = tokenizer(lines)
+        expected = {"input_ids": [[99, 97, 116, 256]]}
+        self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
 
 
 if __name__ == "__main__":
