@@ -1,6 +1,5 @@
 import math
 from tokenization import NllbTokenizer
-from torch import tensor
 from unigram import collect_unigram_counts
 from unigram import compute_unigram_entropy
 from unigram import create_unigram_distribution_from_counts
