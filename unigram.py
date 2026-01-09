@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # years = ["07"]  # , "08", "09", "10", "11"
      
     (train_fn, tokenizer) = {
-        "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer),
+        "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer()),
         "nllb": (train_nllb_tokenizer_unigram_lm, NllbTokenizer("600M")),
     }.get(mode)
 
@@ -155,7 +155,6 @@ if __name__ == "__main__":
         print("AAAAAAAAAAAAAAAAAAAA")
         quit() 
 
-    tokenizer = tokenizer()
     entropy = compute_unigram_entropy(test_data, tokenizer, dist)
     print(f"{mode} unigram entropy: {entropy}")
 
