@@ -5,14 +5,16 @@ import subprocess
 from tokenization import ByteTokenizer
 from tokenization import NllbTokenizer
 from tqdm import tqdm
-from flores_codes import flores_codes 
+from flores_codes import flores_codes
 import sys
+
 
 def collect_unigram_counts(text_file, tokenizer, batch_size=1024, show_progress=True):
     if show_progress:
         result = subprocess.run(["wc", "-l", text_file], capture_output=True, text=True)
         line_count = int(result.stdout.strip().split()[0])
     token_freqs = Counter()
+    counter = 0
     with open(text_file, "r") as reader:
         batch = []
         line_stream = tqdm(reader, total=line_count) if show_progress else reader
@@ -24,6 +26,9 @@ def collect_unigram_counts(text_file, tokenizer, batch_size=1024, show_progress=
                     token_ids = row.tolist()
                     token_freqs.update(token_ids)
                 batch = []
+            counter += 1
+            if counter > 800000:
+                break
 
     if len(batch) > 0:
         inputs = tokenizer(batch)
@@ -131,31 +136,30 @@ def load_unigram_distribution(json_file):
 
 
 if __name__ == "__main__":
-    codes = flores_codes().keys()  
+    codes = flores_codes().keys()
     mode = sys.argv[1]
     src_path = sys.argv[2]
     lang_code = sys.argv[3]
     # years = ["07"]  # , "08", "09", "10", "11"
-     
+
     (train_fn, tokenizer) = {
-        "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer),
+        "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer()),
         "nllb": (train_nllb_tokenizer_unigram_lm, NllbTokenizer("600M")),
     }.get(mode)
 
-    unigram_distribution = train_fn(
-        src_path, f"unigram_lms/{lang_code}.{mode}.unigram_lm.json"
-    )
+    # unigram_distribution = train_fn(
+    #    src_path, f"unigram_lms/{lang_code}.{mode}.unigram_lm.json"
+    # )
     dist = load_unigram_distribution(f"unigram_lms/{lang_code}.{mode}.unigram_lm.json")
     test_data = []
     if lang_code in codes:
         with open(f"/mnt/storage/hopkins/data/flores/dev.{lang_code}", "r") as reader:
             for line in reader:
                 test_data.append(line)
-    else: 
+    else:
         print("AAAAAAAAAAAAAAAAAAAA")
-        quit() 
+        quit()
 
-    tokenizer = tokenizer()
     entropy = compute_unigram_entropy(test_data, tokenizer, dist)
     print(f"{mode} unigram entropy: {entropy}")
 
