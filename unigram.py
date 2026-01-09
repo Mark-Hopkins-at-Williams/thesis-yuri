@@ -5,7 +5,8 @@ import subprocess
 from tokenization import ByteTokenizer
 from tokenization import NllbTokenizer
 from tqdm import tqdm
-
+from flores_codes import flores_codes 
+import sys
 
 def collect_unigram_counts(text_file, tokenizer, batch_size=1024, show_progress=True):
     if show_progress:
@@ -85,7 +86,7 @@ def train_unigram_distribution(
         "k_smoother": k_smoother,
     }
     if json_file is not None:
-        with open(json_file, "w") as writer:
+        with open(json_file, "w+") as writer:
             json.dump(data, writer)
     return create_unigram_distribution_from_counts(
         data["counts"],
@@ -130,33 +131,59 @@ def load_unigram_distribution(json_file):
 
 
 if __name__ == "__main__":
-    mode = "byte"
-    years = ["07"]  # , "08", "09", "10", "11"
-    if mode == "byte":
-        for year in years:
-            src_path = f"/mnt/storage/yuri/thesis-yuri/corpus/training-monolingual/news.20{year}.en.shuffled"
-            unigram_distribution = train_byte_tokenizer_unigram_lm(
-                src_path, "unigram_lms/news.byte.unigram_lm.json"
-            )
-        dist = load_unigram_distribution("unigram_lms/news.byte.unigram_lm.json")
-        test_data = []
-        with open("/mnt/storage/hopkins/data/flores/dev.eng_Latn") as reader:
+    codes = flores_codes().keys()  
+    mode = sys.argv[1]
+    src_path = sys.argv[2]
+    lang_code = sys.argv[3]
+    # years = ["07"]  # , "08", "09", "10", "11"
+     
+    (train_fn, tokenizer) = {
+        "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer),
+        "nllb": (train_nllb_tokenizer_unigram_lm, NllbTokenizer("600M")),
+    }.get(mode)
+
+    unigram_distribution = train_fn(
+        src_path, f"unigram_lms/{lang_code}.{mode}.unigram_lm.json"
+    )
+    dist = load_unigram_distribution(f"unigram_lms/{lang_code}.{mode}.unigram_lm.json")
+    test_data = []
+    if lang_code in codes:
+        with open(f"/mnt/storage/hopkins/data/flores/dev.{lang_code}", "r") as reader:
             for line in reader:
                 test_data.append(line)
-        tokenizer = ByteTokenizer()
-        entropy = compute_unigram_entropy(test_data, tokenizer, dist)
-        print(f"entropy: {entropy}")
-    elif mode == "nllb":
-        for year in years:
-            src_path = f"/mnt/storage/yuri/thesis-yuri/corpus/training-monolingual/news.20{year}.en.shuffled"
-            unigram_distribution = train_nllb_tokenizer_unigram_lm(
-                src_path, "unigram_lms/news.nllb.unigram_lm.json"
-            )
-        dist = load_unigram_distribution("unigram_lms/news.nllb.unigram_lm.json")
-        test_data = []
-        with open("/mnt/storage/hopkins/data/flores/dev.eng_Latn") as reader:
-            for line in reader:
-                test_data.append(line)
-        tokenizer = NllbTokenizer("600M")
-        entropy = compute_unigram_entropy(test_data, tokenizer, dist)
-        print(f"entropy: {entropy}")
+    else: 
+        print("AAAAAAAAAAAAAAAAAAAA")
+        quit() 
+
+    tokenizer = tokenizer()
+    entropy = compute_unigram_entropy(test_data, tokenizer, dist)
+    print(f"{mode} unigram entropy: {entropy}")
+
+    # if mode == "byte":
+    #     for year in years:
+    #         src_path = f"/mnt/storage/yuri/thesis-yuri/corpus/training-monolingual/news.20{year}.en.shuffled"
+    #         unigram_distribution = train_byte_tokenizer_unigram_lm(
+    #             src_path, "unigram_lms/news.byte.unigram_lm.json"
+    #         )
+    #     dist = load_unigram_distribution("unigram_lms/news.byte.unigram_lm.json")
+    #     test_data = []
+    #     with open("/mnt/storage/hopkins/data/flores/dev.eng_Latn") as reader:
+    #         for line in reader:
+    #             test_data.append(line)
+    #     tokenizer = ByteTokenizer()
+    #     entropy = compute_unigram_entropy(test_data, tokenizer, dist)
+    #     print(f"entropy: {entropy}")
+    # elif mode == "nllb":
+    #     for year in years:
+    #         src_path = f"/mnt/storage/yuri/thesis-yuri/corpus/training-monolingual/news.20{year}.en.shuffled"
+    #         unigram_distribution = train_nllb_tokenizer_unigram_lm(
+    #             src_path, "unigram_lms/news.nllb.unigram_lm.json"
+    #         )
+    #     dist = load_unigram_distribution("unigram_lms/news.nllb.unigram_lm.json")
+    #     test_data = []
+    #     with open("/mnt/storage/hopkins/data/flores/dev.eng_Latn") as reader:
+    #         for line in reader:
+    #             test_data.append(line)
+    #     tokenizer = NllbTokenizer("600M")
+    #     entropy = compute_unigram_entropy(test_data, tokenizer, dist)
+    #     print(f"entropy: {entropy}")
