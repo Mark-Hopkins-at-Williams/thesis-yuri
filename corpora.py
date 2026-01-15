@@ -183,10 +183,10 @@ class TokenizedMixtureOfBitexts:
         tokens = self.tokenizer(sents, lang_code=self.lang_codes[corpus])
         if alt_pad_token is not None:
             pad_token_id = self.tokenizer.get_special_tokens()["<pad>"]
-            tokens.input_ids[tokens.input_ids == pad_token_id] = alt_pad_token
+            tokens["input_ids"][tokens["input_ids"] == pad_token_id] = alt_pad_token
         if corpus in self.permutation_map:  # apply the permutation
             p = self.permutation_map[corpus]
-            tokens.input_ids.apply_(p)  # modifies in-place
+            tokens["input_ids"].apply_(p)  # modifies in-place
         return tokens
 
     def next_batch(self):

@@ -1,0 +1,31 @@
+{
+    "finetuning_parameters": {
+        "base_model": "facebook/nllb-200-distilled-600M",
+        "batch_size": 2
+    },
+    "corpora": {
+        "simple": {
+            "en": {
+                "lang_code": "eng_Latn",
+                "train": "test_files/lang1.txt",
+                "dev": "test_files/dev.lang1",
+                "test": "test_files/test.lang1",
+                "permutation": 0
+            },
+            "fr": {
+                "lang_code": "fra_Latn",
+                "train": "test_files/lang2.txt",
+                "dev": "test_files/dev.lang2",
+                "test": "test_files/test.lang2",
+                "permutation": 0
+            }
+        }
+    },
+    "bitexts": [
+        {
+            "corpus": "simple",
+            "src": "fr",
+            "tgt": "en"
+        }
+    ]
+}

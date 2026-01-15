@@ -80,8 +80,6 @@ class ByteTokenizer:
         self.special_tokens = {"</s>": 256, "<pad>": 257}
 
     def __call__(self, sents: List[str], lang_code=None):
-        if type(sents) is not list:
-            sents = [sents]
         input_ids = []
         max_tokens = 0
         for sent in sents:
@@ -97,3 +95,6 @@ class ByteTokenizer:
 
     def __len__(self):
         return 256 + len(self.special_tokens)
+
+    def get_special_tokens(self):
+        return self.special_tokens

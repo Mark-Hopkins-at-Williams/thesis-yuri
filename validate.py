@@ -161,13 +161,12 @@ def evaluate_model(model_name, config_file):
     with open("scores.json", "w") as writer:
         json.dump(scores, writer)
     logger("...scoring complete.")
+    return scores
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate finetuning experiment.")
-    parser.add_argument("--dir", type=str, required=True, help="Experiment directory.")
+    # parser.add_argument("--dir", type=str, required=True, help="Experiment directory.")
     args = parser.parse_args()
     # evaluate_experiment(args.dir)
-    evaluate_model(
-        "facebook/nllb-200-distilled-600M", "examples/nllb_seed_config_small.json"
-    )
+    evaluate_model("facebook/nllb-200-distilled-600M", "data/flores.json")

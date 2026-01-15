@@ -1,5 +1,6 @@
 USE_CUDA = True
 
+from corpora import MixtureOfBitexts, TokenizedMixtureOfBitexts
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -76,6 +77,30 @@ def initialize_tokenizer(config):
     else:
         tokenizer = HuggingfaceTokenizer(model_name, max_length=128)
     return tokenizer
+
+
+def load_tokenized_bitexts(config, tokenizer=None, use_alt_pad_token_for_tgt_lang=True):
+    lang_codes = harvest_language_codes(config)
+    if tokenizer is None:
+        tokenizer = initialize_tokenizer(config)
+    pmap = create_permutations(config, tokenizer)
+    bitexts = {
+        split: MixtureOfBitexts.create_from_config(
+            config, split, only_once_thru=(split != "train")
+        )
+        for split in ["train", "dev", "test"]
+    }
+    tokenized_bitexts = {
+        split: TokenizedMixtureOfBitexts(
+            bitexts[split],
+            tokenizer,
+            lang_codes=lang_codes,
+            permutation_map=pmap,
+            use_alt_pad_token_for_tgt_lang=use_alt_pad_token_for_tgt_lang,
+        )
+        for split in bitexts
+    }
+    return tokenized_bitexts
 
 
 def create_permutations(config, tokenizer):
