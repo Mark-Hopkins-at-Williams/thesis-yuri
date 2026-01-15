@@ -90,14 +90,17 @@ def compute_unconditional_entropy(
 
 if __name__ == "__main__":
     base_model = "facebook/nllb-200-distilled-600M"
-    with open("/mnt/storage/hopkins/data/flores/lang_codes") as reader:
-        lang_codes = [line.strip() for line in reader if line.strip() != "eng_Latn"]
+    # with open("/mnt/storage/hopkins/data/flores/lang_codes") as reader:
+    #     lang_codes = [line.strip() for line in reader if line.strip() != "eng_Latn"]
 
-    lang_codes = ["zho_Hant"]
+    lang_codes = ["zho_Hant", "jpn_Jpan", "spa_Latn", "fra_Latn"]
 
     for lang in tqdm(lang_codes):
         src_path = "/mnt/storage/hopkins/data/flores/dev.eng_Latn"
-        tgt_path = f"/mnt/storage/hopkins/data/flores/dev.{lang}"
+        try: 
+            tgt_path = f"/mnt/storage/hopkins/data/flores/dev.{lang}"
+        except FileNotFoundError: 
+            tgt_path = f"flores/dev.{lang}"
 
         ce = compute_conditional_entropy(
             "eng_Latn", src_path, lang, tgt_path, base_model, batch_size=1
