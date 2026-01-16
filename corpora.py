@@ -55,7 +55,7 @@ class Bitext(IterableDataset):
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
                 if self.lines is None or self.lines[0] <= current_line < self.lines[1]:
-                    yield line.rstrip("\n")
+                    yield line.rstrip("\n").strip()
                 current_line += 1
                 if self.lines is not None and current_line >= self.lines[1]:
                     break
