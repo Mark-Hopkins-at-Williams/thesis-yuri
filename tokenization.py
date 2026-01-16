@@ -98,3 +98,27 @@ class ByteTokenizer:
 
     def get_special_tokens(self):
         return self.special_tokens
+    
+class WhiteSpaceTokenizer:
+    def __init__(self):
+        pass
+
+    def __call__(self, sents: List[str], lang_code=None):
+        input_ids = []
+        max_tokens = 0
+        for sent in sents:
+            tokens = list(sent.encode(self.encoding))
+            tokens.append(self.special_tokens["</s>"])
+            max_tokens = max(max_tokens, len(tokens))
+            input_ids.append(tokens)
+        for i in range(len(input_ids)):
+            while len(input_ids[i]) < max_tokens:
+                input_ids[i].append(self.special_tokens["<pad>"])
+        inputs = {"input_ids": tensor(input_ids)}
+        return inputs
+
+    def __len__(self):
+        return 256 + len(self.special_tokens)
+
+    def get_special_tokens(self):
+        return self.special_tokens

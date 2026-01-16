@@ -2,7 +2,7 @@ from corpora import MixtureOfBitexts
 import json
 import sentencepiece as spm
 
-config_file = "data/simple.json"
+config_file = "test_files/simple.json"
 with open(config_file) as reader:
     config = json.load(reader)
 bitexts = {
@@ -23,6 +23,8 @@ for bitext in config["bitexts"]:
         bitexts[(src, tgt)] = (all_corpora[src], all_corpora[tgt])
 
 
+# train a BPE model
+v_size = 400 # make a command line arg later or something i'm too lazy 
 sp_models = dict()
 for src_key, tgt_key in bitexts:
     if src_key[2] == "train":
@@ -32,20 +34,22 @@ for src_key, tgt_key in bitexts:
         spm.SentencePieceTrainer.train(
             input=tgt_file,
             model_prefix=prefix,
-            vocab_size=400,  # TODO: customize
+            vocab_size=v_size,  # TODO: customize
             user_defined_symbols=[],
             model_type="bpe",
             character_coverage=1.0,  # TODO: customize
         )
 
 for src_key, tgt_key in sp_models:
+    # load bpe model 
     sp = spm.SentencePieceProcessor(model_file=sp_models[(src_key, tgt_key)])
     (src_corpus, src_lang, _) = src_key
     (tgt_corpus, tgt_lang, _) = tgt_key
     bitext_src, bitext_tgt = bitexts[
         ((src_corpus, src_lang, "dev"), (tgt_corpus, tgt_lang, "dev"))
     ]
-    with open(bitext_tgt) as reader:
+    with open(bitext_tgt) as reader, open(f"unigram_training/{src_lang}-to-{tgt_lang}.tokens", 'w') as writer:
         for line in reader:
             tokenized = sp.encode(line, out_type=str)
-            print(tokenized)
+            processed = " ".join(tokenized)
+            writer.write(f"{processed}\n")
