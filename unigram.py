@@ -14,7 +14,6 @@ def collect_unigram_counts(text_file, tokenizer, batch_size=1024, show_progress=
         result = subprocess.run(["wc", "-l", text_file], capture_output=True, text=True)
         line_count = int(result.stdout.strip().split()[0])
     token_freqs = Counter()
-    counter = 0
     with open(text_file, "r") as reader:
         batch = []
         line_stream = tqdm(reader, total=line_count) if show_progress else reader
@@ -26,10 +25,6 @@ def collect_unigram_counts(text_file, tokenizer, batch_size=1024, show_progress=
                     token_ids = row.tolist()
                     token_freqs.update(token_ids)
                 batch = []
-            counter += 1
-            if counter > 800000:
-                break
-
     if len(batch) > 0:
         inputs = tokenizer(batch)
         for row in inputs["input_ids"]:
@@ -56,25 +51,24 @@ def create_unigram_distribution_from_counts(
     return distribution
 
 
-def compute_unigram_entropy(lines, tokenizer, unigram_distribution):
+def compute_unigram_entropy(line, tokenizer, unigram_distribution):
     entropy = 0.0
-    for line in lines:
-        inputs = tokenizer(line.strip())
-        token_vals = inputs["input_ids"].squeeze().tolist()
-        in_prologue = True
-        in_epilogue = False
-        for token in token_vals:
-            try:
-                token_prob = unigram_distribution(token)
-                in_prologue = False
-                if in_epilogue:
-                    raise Exception(f"Found token in the wrong place: {line}")
-                entropy += -math.log2(token_prob)
-            except KeyError:
-                if in_prologue or in_epilogue:
-                    pass
-                else:
-                    in_epilogue = True
+    inputs = tokenizer([line.strip()])
+    token_vals = inputs["input_ids"].squeeze().tolist()
+    in_prologue = True
+    in_epilogue = False
+    for token in token_vals:
+        try:
+            token_prob = unigram_distribution(token)
+            in_prologue = False
+            if in_epilogue:
+                raise Exception(f"Found token in the wrong place: {line}")
+            entropy += -math.log2(token_prob)
+        except KeyError:
+            if in_prologue or in_epilogue:
+                pass
+            else:
+                in_epilogue = True
     return entropy
 
 
@@ -91,8 +85,8 @@ def train_unigram_distribution(
         "k_smoother": k_smoother,
     }
     if json_file is not None:
-        with open(json_file, "w+") as writer:
-            json.dump(data, writer)
+        with open(json_file, "w") as writer:
+            json.dump(data, writer, indent=4)
     return create_unigram_distribution_from_counts(
         data["counts"],
         data["vocab_size"],
