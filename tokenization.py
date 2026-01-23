@@ -103,10 +103,19 @@ class WhiteSpaceTokenizer: # will only work on a string i guess
     def __init__(self):
         self.special_tokens = {}
 
-    def __call__(self, sent: str, lang_code=None):
-        tokens = sent.split()
-        inputs = {"input_ids": tokens}
+    def __call__(self, sents: List[str], lang_code=None):
+        input_ids = []
+        for sent in sents: 
+            tokens = sent.split()
+            # input_ids.append(tokens)
+            input_ids += tokens # += bc don't i want input_ids to be a 1D list of just tokens...????
+        inputs = {"input_ids": input_ids} # ok actually should the value be a 1d list or nah ??????????? 
         return inputs
+    
+    # def __call__(self, sent: str, lang_code=None):
+    #     tokens = sent.split()
+    #     inputs = {"input_ids": tokens}
+    #     return inputs
 
     def __len__(self):
         return 256 + len(self.special_tokens) # too lazy to code this rn 

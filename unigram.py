@@ -6,8 +6,8 @@ from tokenization import ByteTokenizer, NllbTokenizer, WhiteSpaceTokenizer
 from tqdm import tqdm
 from flores_codes import flores_codes
 from download import download
-import sys
-
+import argparse
+import torch 
 
 def collect_unigram_counts(text_file, tokenizer, num_lines=1000000, batch_size=1024, show_progress=True):
     if show_progress:
@@ -21,13 +21,17 @@ def collect_unigram_counts(text_file, tokenizer, num_lines=1000000, batch_size=1
         for line in line_stream:
             batch.append(line.strip())
             if len(batch) >= batch_size:
-                inputs = tokenizer(batch)
-                for row in inputs["input_ids"]:
+                inputs = tokenizer(batch) # why are we using tokenizer on a LIST here ????????? 
+                for row in inputs["input_ids"]: # now we assume inputs["input_ids"] is a 2D list????? "row" should be a list??????????? 
                     if isinstance(row, list):
                         token_ids = row 
-                    else: # hope this is a torch tensor D:
+                        token_freqs.update(token_ids)
+                    elif isinstance(row, torch.Tensor): # hope this is a torch tensor D:
                         token_ids = row.tolist()
-                    token_freqs.update(token_ids)
+                        token_freqs.update(token_ids)
+                    else: 
+                        print("WEEWOOOWEEWOOWEEEWOOO. expected list or tensor, got smth else")
+                        exit()
                 batch = []
             counter += 1
             if counter > num_lines:
@@ -52,25 +56,27 @@ def create_unigram_distribution_from_counts(
         else:
             return (token_counts.get(token, 0) + k_smoother) / total_token_count
 
-    total_token_count = 0
-    for token in set(range(vocab_size)) - tokens_to_ignore:
-        if token not in tokens_to_ignore:
-            total_token_count += (
-                token_counts.get(token, 0) + k_smoother
-            )  # add-k smoothing
+    total_token_count = sum(k for k in token_counts.values() if k not in tokens_to_ignore)
+    # for token in set(range(vocab_size)) - tokens_to_ignore:
+    #     if token not in tokens_to_ignore:
+    #         total_token_count += (
+    #             token_counts.get(token, 0) + k_smoother
+    #         )  # add-k smoothing 
     return distribution
 
 
 def compute_unigram_entropy(lines, tokenizer, unigram_distribution): # lines should be a list of str?? 
     entropy = 0.0
     for line in lines:
-        inputs = tokenizer(line.strip())
+        inputs = tokenizer(line.strip()) # why are we using tokenizer on a string here ????????? 
         # print(inputs)
         # print(f"type: {type(inputs)}")
         if isinstance(inputs["input_ids"], list):
             token_vals = inputs["input_ids"] # THIS SHOULD BE A 1D LIST???
         else: # pray that it's a tensor 
-            token_vals = inputs["input_ids"].squeeze().tolist()
+            # token_vals = inputs["input_ids"].squeeze().tolist() # why was this squeeze
+            token_vals = inputs["input_ids"].flatten().tolist()
+        # print(token_vals)
         in_prologue = True
         in_epilogue = False
         for token in token_vals:
@@ -87,6 +93,17 @@ def compute_unigram_entropy(lines, tokenizer, unigram_distribution): # lines sho
                     in_epilogue = True
     return entropy
 
+def compute_bpe_entropy(lines, tokenizer, unigram_distribution): # lines should be a list of str?? 
+    entropy = 0.0
+    inputs = tokenizer(lines) 
+    token_vals = inputs["input_ids"] # should just be a list of all tokens 
+    for token in token_vals:
+        # print(f"actual token: {token}")
+        token_prob = unigram_distribution(token)
+        # print(f"token prob: {token_prob}")
+        entropy += -math.log2(token_prob)
+    return entropy
+
 
 def train_unigram_distribution(
     text_file, tokenizer, num_lines, tokens_to_ignore, k_smoother, unk_token=None, json_file=None
@@ -101,7 +118,7 @@ def train_unigram_distribution(
         "k_smoother": k_smoother,
     }
     if json_file is not None:
-        with open(json_file, "w+") as writer:
+        with open(json_file, "w") as writer:
             json.dump(data, writer)
     return create_unigram_distribution_from_counts(
         data["counts"],
@@ -145,7 +162,7 @@ def train_byte_tokenizer_unigram_lm(text_file, json_file):
 def load_unigram_distribution(json_file):
     with open(json_file) as reader:
         data = json.load(reader)
-    counts = data["counts"]
+    counts = data["counts"] # dict of each unique token -> frequency 
     return create_unigram_distribution_from_counts(
         {k: counts[k] for k in counts}, # used to cast k as an int, is that ever needed? stopped casting to int bc bpe tokens are strings, but can configure later 
         data["vocab_size"],
@@ -156,52 +173,77 @@ def load_unigram_distribution(json_file):
 
 if __name__ == "__main__":
     codes = flores_codes().keys()
-    mode = sys.argv[1]
-    src_path = sys.argv[2]
-    lang_code = sys.argv[3]
-    # years = ["07"]  # , "08", "09", "10", "11"
+    parser = argparse.ArgumentParser(description="Calculate unigram entropy!")
+    parser.add_argument(
+        "mode", type=str, help="byte, bpe, or nllb unigram"
+    )
+    parser.add_argument(
+        "--path", type=str
+    )
+    parser.add_argument(
+        "lang_code", type=str
+    )
+    parser.add_argument(
+        "-b", "--bpe_vocab_size", type=str, default="16k"
+    )
+    args = parser.parse_args()
+    mode = args.mode 
+    src_path = args.path 
+    lang_code = args.lang_code
+    bpe_vocab_size = args.bpe_vocab_size
+
+    if mode == "bpe":
+        unigram_path = f"unigram_lms/{lang_code}.{bpe_vocab_size}-{mode}.unigram_lm.json"
+        bpe_dev_path = f"flores/bpe_tokenized/{bpe_vocab_size}.dev.{lang_code}"
+    else: 
+        unigram_path = f"unigram_lms/{lang_code}.{mode}.unigram_lm.json"
 
     (train_fn, tokenizer) = {
         "byte": (train_byte_tokenizer_unigram_lm, ByteTokenizer()),
         "nllb": (train_nllb_tokenizer_unigram_lm, NllbTokenizer("600M")),
-        "bpe": (train_bpe_tokenizer_unigram_lm, WhiteSpaceTokenizer()) # TODO change tokenizer 
+        "bpe": (train_bpe_tokenizer_unigram_lm, WhiteSpaceTokenizer())
     }.get(mode)
 
     try: 
-        dist = load_unigram_distribution(f"unigram_lms/{lang_code}.{mode}.unigram_lm.json")
+        dist = load_unigram_distribution(unigram_path)
     except FileNotFoundError:
         # make unigram lm if not alr existing
         unigram_distribution = train_fn(
-        src_path, f"unigram_lms/{lang_code}.{mode}.unigram_lm.json"
-        )
-        dist = load_unigram_distribution(f"unigram_lms/{lang_code}.{mode}.unigram_lm.json")
+        src_path, unigram_path
+        ) 
+        dist = load_unigram_distribution(unigram_path)
     
     test_data = []
     if lang_code in codes:
-        try: 
-            with open(f"/mnt/storage/hopkins/data/flores/dev.{lang_code}", "r") as reader:
+        if mode == "bpe":
+            with open(bpe_dev_path, "r") as reader:
                 for line in reader:
                     test_data.append(line)
-        except FileNotFoundError: 
+        else:
             try: 
-                with open(f"flores/dev.{lang_code}", "r") as reader:
+                with open(f"/mnt/storage/hopkins/data/flores/dev.{lang_code}", "r") as reader:
                     for line in reader:
                         test_data.append(line)
+            except FileNotFoundError: 
+                try: 
+                    with open(f"flores/dev.{lang_code}", "r") as reader:
+                        for line in reader:
+                            test_data.append(line)
+                except: 
+                    download([lang_code])
+                    with open(f"flores/dev.{lang_code}", "r") as reader:
+                        for line in reader:
+                            test_data.append(line)
             except: 
-                download([lang_code])
-                with open(f"flores/dev.{lang_code}", "r") as reader:
-                    for line in reader:
-                        test_data.append(line)
-        except: 
-            print("you fucked up somehow")
+                print("you fucked up somehow")
     else:
         print("AAAAAAAAAAAAAAAAAAAA")
         quit()
 
     # test_data is a list of str always ?? 
-    entropy = compute_unigram_entropy(test_data, tokenizer, dist)
     if mode == "bpe": 
-        vocab_size = "8k"
-        print(f"{vocab_size} {mode} unigram entropy for {lang_code}: {entropy}")
+        entropy = compute_bpe_entropy(test_data, tokenizer, dist)
+        print(f"{bpe_vocab_size} {mode} unigram entropy for {lang_code}: {entropy}")
     else:
+        entropy = compute_unigram_entropy(test_data, tokenizer, dist)
         print(f"{mode} unigram entropy for {lang_code}: {entropy}")
