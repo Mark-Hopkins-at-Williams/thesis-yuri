@@ -51,6 +51,21 @@ def create_unigram_distribution_from_counts(
     return distribution
 
 
+def create_unigram_dict_from_counts(
+    token_counts, vocab_size, tokens_to_ignore, k_smoother=1
+):
+    total_token_count = 0
+    probs = dict()
+    for token in set(range(vocab_size)) - tokens_to_ignore:
+        if token not in tokens_to_ignore:
+            total_token_count += (
+                token_counts.get(token, 0) + k_smoother
+            )  # add-k smoothing
+            probs[token] = (token_counts.get(token, 0) + k_smoother) / total_token_count
+
+    return probs
+
+
 def compute_unigram_entropy(line, tokenizer, unigram_distribution):
     entropy = 0.0
     inputs = tokenizer([line.strip()])
@@ -88,6 +103,29 @@ def train_unigram_distribution(
         with open(json_file, "w") as writer:
             json.dump(data, writer, indent=4)
     return create_unigram_distribution_from_counts(
+        data["counts"],
+        data["vocab_size"],
+        set(data["tokens_to_ignore"]),
+        data["k_smoother"],
+    )
+
+
+def train_unigram_dict(
+    text_file, tokenizer, tokens_to_ignore, k_smoother, unk_token=None, json_file=None
+):
+    token_counts = collect_unigram_counts(text_file, tokenizer)
+    if unk_token is not None:
+        token_counts[unk_token] = 1
+    data = {
+        "counts": token_counts,
+        "vocab_size": len(tokenizer),
+        "tokens_to_ignore": sorted(tokens_to_ignore),
+        "k_smoother": k_smoother,
+    }
+    if json_file is not None:
+        with open(json_file, "w") as writer:
+            json.dump(data, writer, indent=4)
+    return create_unigram_dict_from_counts(
         data["counts"],
         data["vocab_size"],
         set(data["tokens_to_ignore"]),

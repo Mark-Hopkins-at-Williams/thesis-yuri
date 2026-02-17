@@ -1,6 +1,7 @@
 import unittest
 from tokenization import ByteTokenizer
 from tokenization import NllbTokenizer
+from tokenization import WhiteSpaceTokenizer
 from torch import tensor
 
 
@@ -97,10 +98,18 @@ class TestTokenization(unittest.TestCase):
 
     def test_byte_tokenizer4(self):
         tokenizer = ByteTokenizer()
-        lines = "cat"
+        lines = ["cat"]
         tokenized = tokenizer(lines)
         expected = {"input_ids": [[99, 97, 116, 256]]}
         self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
+
+    def test_whitespace_tokenizer(self):
+        tokenizer = WhiteSpaceTokenizer()
+        lines = ["the fast cat", "the slow dog"]
+        tokenized = tokenizer(lines)
+        print(tokenized)
+        # expected = {"input_ids": [[99, 97, 116, 256]]}
+        # self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
 
 
 if __name__ == "__main__":

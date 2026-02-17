@@ -1,6 +1,7 @@
 import math
 import random
-from simple_unigram import train_unigram_distribution
+from simple_unigram import train_unigram_distribution, train_unigram_dict
+from huffman import huffman
 
 
 def generate_token():
@@ -10,7 +11,7 @@ def generate_token():
     elif random_draw < 0.75:
         return "ca"
     else:
-        return "a\n"
+        return "a "
 
 
 def generate_string(num_tokens):
@@ -63,17 +64,18 @@ if __name__ == "__main__":
         for sent in generate_string(1000000):
             writer.write(f"{sent}")
 
-    tokenizer = char_tokenizer
-    dist = train_unigram_distribution(f"{file_prefix}.train", tokenizer)
-    encoding_len = get_encoding_length(f"{file_prefix}.test", tokenizer)
-    print(f"char tokenizer: {encoding_len}")
+    # tokenizer = char_tokenizer
+    # dist = train_unigram_dict(f"{file_prefix}.train", tokenizer)
 
-    tokenizer = real_tokenizer
-    dist = train_unigram_distribution(f"{file_prefix}.train", tokenizer)
-    encoding_len = get_encoding_length(f"{file_prefix}.test", tokenizer)
-    print(f"real tokenizer: {encoding_len}")
+    # encoding_len = get_encoding_length(f"{file_prefix}.test", tokenizer)
+    # print(f"char tokenizer: {encoding_len}")
+
+    # tokenizer = real_tokenizer
+    # dist = train_unigram_distribution(f"{file_prefix}.train", tokenizer)
+    # encoding_len = get_encoding_length(f"{file_prefix}.test", tokenizer)
+    # print(f"real tokenizer: {encoding_len}")
 
     tokenizer = bad_tokenizer
-    dist = train_unigram_distribution(f"{file_prefix}.train", tokenizer)
-    encoding_len = get_encoding_length(f"{file_prefix}.test", tokenizer)
-    print(f"bad tokenizer: {encoding_len}")
+    dist = train_unigram_dict(f"{file_prefix}.train", tokenizer)
+    print(dist)
+    print(huffman(dist))
