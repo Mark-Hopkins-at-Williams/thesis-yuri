@@ -19,7 +19,7 @@ def train_sentencepiece_tokenizer(
         pad_piece="<pad>",
         unk_piece="<unk>",
         eos_piece="</s>",
-        control_symbols=["spa_Latn", "quy_Latn"],
+        control_symbols=["spa_Latn", "quy_Latn", "fra_Latn", "eng_Latn"],
         model_type="bpe",
         character_coverage=character_coverage,
     )
