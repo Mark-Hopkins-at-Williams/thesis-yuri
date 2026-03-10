@@ -5,4 +5,4 @@
 #SBATCH -o logs/log_%j.out
 #SBATCH -e logs/log_%j.err
 #SBATCH --gres=gpu:1
-python mdl_experiment.py
+python finetune.py --config configs/es-quy-sp.json

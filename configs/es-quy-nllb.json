@@ -1,0 +1,42 @@
+{
+    "model_dir": "/mnt/storage/yuri/thesis-yuri/transformer_models/spa-quy",
+    "finetuning_parameters": {
+        "base_model": "facebook/nllb-200-distilled-600M",
+        "finetune": false,
+        "freeze_encoder": false,
+        "freeze_decoder": false,
+        "batch_size": 32,
+        "num_steps": 20000
+    },
+    "corpora": {
+        "es-quy": {
+            "es": {
+                "lang_code": "spa_Latn",
+                "train": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/train.es",
+                "dev": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dev.es",
+                "test": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dict.es",
+                "permutation": 0
+            },
+            "quy": {
+                "lang_code": "quy_Latn",
+                "train": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/train.quy",
+                "dev": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dev.quy",
+                "test": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dict.quy",
+                "permutation": 0
+            }
+        }
+    },
+    "bitexts": [
+        {
+            "corpus": "es-quy",
+            "src": "es",
+            "tgt": "quy",
+            "src_tokenizer": "bpe_models/es-8000-v0",
+            "tgt_tokenizer": "bpe_models/quy-8000-v0",
+            "train_lines": [
+                0,
+                125008
+            ]
+        }
+    ]
+}

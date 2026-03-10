@@ -1,10 +1,11 @@
 import sys
-from torch import tensor
 from transformers import AutoTokenizer
 from typing import Dict, Tuple, List, Optional, Iterator, Callable
 import warnings
 from abc import ABC
 from abc import abstractmethod
+
+import sentencepiece as spm
 
 
 class Tokenizer(ABC):
@@ -54,13 +55,14 @@ class HuggingfaceTokenizer(Tokenizer):
     def __call__(self, sents: List[str], lang_code=None):
         if lang_code is not None:
             self.tokenizer.src_lang = lang_code
-        return self.tokenizer(
+        result = self.tokenizer(
             sents,
             return_tensors="pt",
             padding=True,
             truncation=True,
             max_length=self.max_length if self.max_length is not None else None,
         )
+        return result["input_ids"].squeeze().tolist()
 
     def get_special_tokens(self):
         return self.special_tokens
@@ -68,59 +70,43 @@ class HuggingfaceTokenizer(Tokenizer):
     def batch_decode(self, token_ids):
         return self.tokenizer.batch_decode(token_ids, skip_special_tokens=True)
 
+    def convert_ids_to_tokens(self, ids):
+        return self.tokenizer.convert_ids_to_tokens(ids)
+
 
 class NllbTokenizer(HuggingfaceTokenizer):
     def __init__(self, size, max_length=None):
         super().__init__(f"facebook/nllb-200-distilled-{size}", max_length=max_length)
 
 
-class ByteTokenizer:
-    def __init__(self, encoding="utf-8"):
-        self.encoding = encoding
-        self.special_tokens = {"</s>": 256, "<pad>": 257}
+class SentencePieceTokenizer(Tokenizer):
 
-    def __call__(self, sents: List[str], lang_code=None):
-        input_ids = []
-        max_tokens = 0
-        for sent in sents:
-            tokens = list(sent.encode(self.encoding))
-            tokens.append(self.special_tokens["</s>"])
-            max_tokens = max(max_tokens, len(tokens))
-            input_ids.append(tokens)
-        for i in range(len(input_ids)):
-            while len(input_ids[i]) < max_tokens:
-                input_ids[i].append(self.special_tokens["<pad>"])
-        inputs = {"input_ids": tensor(input_ids)}
-        return inputs
+    def __init__(self, model_dir, max_length=None):
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.load(model_dir)
+        self.max_length = max_length
 
     def __len__(self):
-        return 256 + len(self.special_tokens)
+        return self.sp.get_piece_size()
+
+    def __call__(self, sent: str, lang_code=None):
+        if lang_code is not None:
+            ids = [self.sp.piece_to_id(lang_code)]
+        else:
+            ids = []
+        ids.extend(self.sp.encode(sent, out_type=int))
+        ids.append(self.sp.eos_id())
+        return ids
 
     def get_special_tokens(self):
-        return self.special_tokens
+        return {
+            "<unk>": self.sp.unk_id(),
+            "</s>": self.sp.eos_id(),
+            "<pad>": self.sp.pad_id(),
+        }
 
+    def batch_decode(self, token_ids):
+        return self.sp.decode(token_ids)
 
-class PretokenizedBPETokenizer:
-    def __init__(self, vocab_size):
-        self.special_tokens = {"</s>": vocab_size, "<pad>": vocab_size + 1}
-        self.vocab_size = vocab_size + len(self.special_tokens)
-
-    def __call__(self, sents: List[str], lang_code=None):
-        input_ids = []
-        max_tokens = 0
-        for sent in sents:
-            tokens = [int(tok) for tok in sent.strip().split()]
-            tokens.append(self.special_tokens["</s>"])
-            max_tokens = max(max_tokens, len(tokens))
-            input_ids.append(tokens)
-        for i in range(len(input_ids)):
-            while len(input_ids[i]) < max_tokens:
-                input_ids[i].append(self.special_tokens["<pad>"])
-        inputs = {"input_ids": tensor(input_ids)}
-        return inputs
-
-    def __len__(self):
-        return self.vocab_size
-
-    def get_special_tokens(self):
-        return self.special_tokens
+    def convert_ids_to_tokens(self, ids):
+        return [self.sp.id_to_piece(id) for id in ids]

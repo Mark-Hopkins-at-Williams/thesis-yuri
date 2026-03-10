@@ -1,7 +1,6 @@
 import unittest
-from tokenization import ByteTokenizer
 from tokenization import NllbTokenizer
-from tokenization import WhiteSpaceTokenizer
+from tokenization import SentencePieceTokenizer
 from torch import tensor
 
 
@@ -110,6 +109,14 @@ class TestTokenization(unittest.TestCase):
         print(tokenized)
         # expected = {"input_ids": [[99, 97, 116, 256]]}
         # self.assertEqual(tokenized["input_ids"].tolist(), expected["input_ids"])
+
+
+class TestSentencePiece(unittest.TestCase):
+    def test_sp_tokenizer(self):
+        tokenizer = SentencePieceTokenizer("bpe_models/es-8000-v0/bpe.8000.model")
+        sents = "El perro duerme en la casa."
+        toks = tokenizer(sents, lang_code="spa_Latn")
+        print(toks)
 
 
 if __name__ == "__main__":

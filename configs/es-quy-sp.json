@@ -1,0 +1,56 @@
+{
+    "model_dir": "/mnt/storage/hopkins/thesis-yuri/experiments/spa-quy",
+    "finetuning_parameters": {
+        "base_model": "facebook/nllb-200-distilled-600M",
+        "finetune": false,
+        "freeze_encoder": false,
+        "freeze_decoder": false,
+        "report_every": 50,
+        "validate_every": 50,
+        "patience": 5,
+        "batch_size": 32,
+        "src_pad_id": 2,
+        "tgt_pad_id": -100,
+        "num_steps": 20000
+    },
+    "tokenizers": {
+        "sp-quy": {
+            "type": "sentencepiece",
+            "model": "bpe_models/quy-8000-v0/bpe.8000.model",
+            "max_length": 512
+        },
+        "sp-es": {
+            "type": "sentencepiece",
+            "model": "bpe_models/es-8000-v0/bpe.8000.model",
+            "max_length": 512
+        }
+    },
+    "corpora": {
+        "es": {
+            "lang_code": "spa_Latn",
+            "train": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/train.es",
+            "dev": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dev.es",
+            "test": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dict.es",
+            "encipherment": "0",
+            "tokenizer": "sp-es"
+        },
+        "quy": {
+            "lang_code": "quy_Latn",
+            "train": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/train.quy",
+            "dev": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dev.quy",
+            "test": "/mnt/storage/yuri/thesis-yuri/data_stuff/quechua-spanish/dict.quy",
+            "encipherment": "0",
+            "tokenizer": "sp-quy"
+        }
+    },
+    "bitexts": [
+        {
+            "src": "es",
+            "tgt": "quy",
+            "train_lines": [
+                0,
+                125008
+            ]
+        }
+    ]
+}
