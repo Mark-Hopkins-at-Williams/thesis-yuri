@@ -106,6 +106,8 @@ class SentencePieceTokenizer(Tokenizer):
         }
 
     def batch_decode(self, token_ids):
+        if hasattr(token_ids, 'tolist'):
+            token_ids = token_ids.tolist()
         return self.sp.decode(token_ids)
 
     def convert_ids_to_tokens(self, ids):
