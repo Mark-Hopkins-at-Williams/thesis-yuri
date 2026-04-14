@@ -5,7 +5,7 @@ import os
 
 
 def train_sentencepiece_tokenizer(
-    train_file, vocab_size, model_dir, character_coverage=1.0
+    train_file, vocab_size, model_dir, character_coverage=0.9995 # don't set to 1.0 bc using corpuses that are not necessarily clean ?
 ):
     model_prefix = Path(model_dir) / f"bpe.{vocab_size}"
     spm.SentencePieceTrainer.train(
@@ -36,14 +36,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--vocab_size", type=int, required=True, help="Vocab size for tokenizer"
     )
+    parser.add_argument(
+        "--lang", type=str, required=True, help="Language being trained on"
+    )
     args = parser.parse_args()
 
     # make directory for tokenizer files
     base_dir = args.dir
+    lang_code = args.lang
     model_version = 0
-    while os.path.exists(f"{base_dir}-{args.vocab_size}-v{model_version}"):
+    while os.path.exists(f"{base_dir}{lang_code}-{args.vocab_size}-v{model_version}"):
         model_version += 1
-    model_dir = f"{base_dir}-{args.vocab_size}-v{model_version}"
+    model_dir = f"{base_dir}{lang_code}-{args.vocab_size}-v{model_version}"
     os.makedirs(model_dir)
 
     train_sentencepiece_tokenizer(args.train, args.vocab_size, model_dir)
